@@ -1,0 +1,74 @@
+<mxfile host="app.diagrams.net" modified="2026-09-28T00:00:00.000Z" agent="ChatGPT" version="24.7.17">
+  <diagram name="Banco de Dados" id="db-model">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="usuario" value="&lt;b&gt;USUARIO&lt;/b&gt;&lt;br&gt;PK id_usuario&lt;br&gt;nome&lt;br&gt;email&lt;br&gt;senha&lt;br&gt;perfil" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="190" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="sala" value="&lt;b&gt;SALA&lt;/b&gt;&lt;br&gt;PK id_sala&lt;br&gt;nome&lt;br&gt;localizacao&lt;br&gt;capacidade&lt;br&gt;situacao" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="350" y="40" width="190" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="laboratorio" value="&lt;b&gt;LABORATORIO&lt;/b&gt;&lt;br&gt;PK id_laboratorio&lt;br&gt;nome&lt;br&gt;localizacao&lt;br&gt;capacidade&lt;br&gt;situacao" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="350" y="220" width="190" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="equipamento" value="&lt;b&gt;EQUIPAMENTO&lt;/b&gt;&lt;br&gt;PK id_equipamento&lt;br&gt;patrimonio&lt;br&gt;numero_simplificado&lt;br&gt;tipo&lt;br&gt;modelo&lt;br&gt;marca&lt;br&gt;localizacao&lt;br&gt;situacao" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="350" y="400" width="210" height="190" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="reserva" value="&lt;b&gt;RESERVA&lt;/b&gt;&lt;br&gt;PK id_reserva&lt;br&gt;FK id_usuario&lt;br&gt;data&lt;br&gt;hora_inicio&lt;br&gt;hora_fim&lt;br&gt;finalidade&lt;br&gt;status" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="670" y="150" width="210" height="170" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="bloqueio" value="&lt;b&gt;BLOQUEIO&lt;/b&gt;&lt;br&gt;PK id_bloqueio&lt;br&gt;FK id_usuario&lt;br&gt;tipo_recurso&lt;br&gt;id_recurso&lt;br&gt;data_inicio&lt;br&gt;data_fim&lt;br&gt;motivo" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="670" y="390" width="210" height="170" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="manutencao" value="&lt;b&gt;MANUTENCAO&lt;/b&gt;&lt;br&gt;PK id_manutencao&lt;br&gt;FK id_equipamento&lt;br&gt;descricao&lt;br&gt;data_inicio&lt;br&gt;data_fim&lt;br&gt;status" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="930" y="400" width="210" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;" edge="1" parent="1" source="usuario" target="reserva">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e2" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;" edge="1" parent="1" source="usuario" target="bloqueio">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e3" value="reservas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=ERmany;" edge="1" parent="1" source="sala" target="reserva">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e4" value="reservas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=ERmany;" edge="1" parent="1" source="laboratorio" target="reserva">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e5" value="reservas" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=ERmany;" edge="1" parent="1" source="equipamento" target="reserva">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e6" value="manutencao" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;" edge="1" parent="1" source="equipamento" target="manutencao">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e7" value="bloqueios" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=ERmany;" edge="1" parent="1" source="sala" target="bloqueio">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e8" value="bloqueios" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=ERmany;" edge="1" parent="1" source="laboratorio" target="bloqueio">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e9" value="bloqueios" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=ERmany;" edge="1" parent="1" source="equipamento" target="bloqueio">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
