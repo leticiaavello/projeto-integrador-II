@@ -1,0 +1,11 @@
+{
+  "title": "sistemadereservas",
+  "description": "Displays a homepage with a header featuring site name, contact, about, and login buttons, plus a central image carousel with overlay text for user engagement.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
