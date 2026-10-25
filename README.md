@@ -69,7 +69,7 @@ As credenciais de acesso ao banco devem ser configuradas por meio de variáveis 
 
 Para executar o sistema, é necessário configurar o ambiente Python e instalar as dependências do backend, instalar as dependências do frontend com npm e configurar uma instância do PostgreSQL.
 
-As instruções completas de instalação, configuração do banco e inicialização dos servidores serão documentadas conforme a consolidação do ambiente de desenvolvimento.
+Veja o passo a passo completo em [docs/GUIA_BACKEND.md](docs/GUIA_BACKEND.md).
 
 ## Status do projeto
 

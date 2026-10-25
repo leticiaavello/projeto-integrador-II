@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Button from 'react-bootstrap/Button';
+import * as api from './api.js';
+import * as adminUsuarios from './adminUsuarios.js';
 const AUTH_STORAGE_KEY = 'gestao-escolar-user';
 const PAGE_STORAGE_KEY = 'gestao-escolar-page';
 const VALID_AUTHENTICATED_PAGES = [
@@ -15,6 +17,7 @@ const VALID_AUTHENTICATED_PAGES = [
   'sec-salas',
   'sec-labs',
   'sec-patrimonio',
+  'admin-usuarios',
 ];
 
 function readSavedUser() {
@@ -22,7 +25,12 @@ function readSavedUser() {
     const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw);
-    const validRoles = ['professor', 'coordenacao', 'secretaria'];
+    const validRoles = [
+      'professor',
+      'coordenacao',
+      'secretaria',
+      'administrador',
+    ];
     if (
       saved &&
       typeof saved === 'object' &&
@@ -222,6 +230,262 @@ const Breadcrumb = ({ label: lbl, onBack }) => (<div style={{ display: 'flex', a
     <span style={{ color: 'var(--muted-foreground)', fontSize: '0.8rem' }}>›</span>
     <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{lbl}</span>
   </div>);
+
+const PageAdminUsuarios = ({ backToDash }) => {
+  const [usuarios, setUsuarios] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
+
+  const [form, setForm] = useState({
+    username: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    password: '',
+    perfil: 'professor',
+  });
+
+  const perfis = {
+    professor: 'Professor',
+    coordenacao: 'Coordenação',
+    secretaria: 'Secretaria',
+    administrador: 'Administrador TI',
+  };
+
+  const carregarUsuarios = async () => {
+    try {
+      setCarregando(true);
+      setErro('');
+      const dados = await adminUsuarios.listarUsuarios();
+      setUsuarios(Array.isArray(dados) ? dados : dados.results || []);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarUsuarios();
+  }, []);
+
+  const cadastrar = async (e) => {
+    e.preventDefault();
+    setErro('');
+    setSucesso('');
+    setSalvando(true);
+
+    try {
+      await adminUsuarios.criarUsuario(form);
+      setSucesso('Usuário cadastrado com sucesso!');
+      setForm({
+        username: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        password: '',
+        perfil: 'professor',
+      });
+      await carregarUsuarios();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const alterarSituacao = async (usuario) => {
+    setErro('');
+    setSucesso('');
+
+    try {
+      if (usuario.is_active) {
+        await adminUsuarios.desativarUsuario(usuario.id);
+      } else {
+        await adminUsuarios.ativarUsuario(usuario.id);
+      }
+
+      await carregarUsuarios();
+      setSucesso('Situação atualizada com sucesso.');
+    } catch (e) {
+      setErro(e.message);
+    }
+  };
+
+  return (
+    <main style={{
+      flex: 1,
+      padding: '2.5rem 2rem',
+      background: 'var(--secondary)',
+    }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+        <Breadcrumb
+          label="Gerenciar Usuários"
+          onBack={backToDash}
+        />
+
+        <h1>Gerenciar Usuários</h1>
+        <p>Cadastre e administre as contas da escola.</p>
+
+        {erro && (
+          <p role="alert" style={{ color: '#c0392b' }}>
+            {erro}
+          </p>
+        )}
+
+        {sucesso && (
+          <p role="status" style={{ color: '#2e7d5e' }}>
+            {sucesso}
+          </p>
+        )}
+
+        <form onSubmit={cadastrar} style={{
+          background: 'var(--background)',
+          padding: 24,
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          marginTop: 24,
+          marginBottom: 32,
+        }}>
+          <h2 style={{ marginBottom: 20 }}>
+            Cadastrar novo usuário
+          </h2>
+
+          {[
+            ['username', 'Nome de usuário'],
+            ['first_name', 'Nome'],
+            ['last_name', 'Sobrenome'],
+            ['email', 'E-mail'],
+            ['password', 'Senha'],
+          ].map(([chave, titulo]) => (
+            <div key={chave} style={{ marginBottom: 14 }}>
+              <label style={label} htmlFor={`admin-${chave}`}>
+                {titulo}
+              </label>
+              <input
+                id={`admin-${chave}`}
+                style={field}
+                type={
+                  chave === 'password' ? 'password' :
+                  chave === 'email' ? 'email' : 'text'
+                }
+                minLength={chave === 'password' ? 10 : undefined}
+                required={['username', 'email', 'password'].includes(chave)}
+                value={form[chave]}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    [chave]: e.target.value,
+                  })
+                }
+              />
+            </div>
+          ))}
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={label} htmlFor="admin-perfil">
+              Perfil de acesso
+            </label>
+            <select
+              id="admin-perfil"
+              style={selectStyle}
+              value={form.perfil}
+              onChange={(e) =>
+                setForm({ ...form, perfil: e.target.value })
+              }
+            >
+              {Object.entries(perfis).map(([codigo, nome]) => (
+                <option key={codigo} value={codigo}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button
+            type="submit"
+            disabled={salvando}
+            style={btn({
+              background: 'var(--primary)',
+              color: '#fff',
+            })}
+          >
+            {salvando ? 'Salvando...' : 'Cadastrar usuário'}
+          </Button>
+        </form>
+
+        <h2>Usuários cadastrados</h2>
+
+        {carregando ? (
+          <p>Carregando usuários...</p>
+        ) : (
+          <div style={{ overflowX: 'auto', marginTop: 16 }}>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              background: 'var(--background)',
+            }}>
+              <thead>
+                <tr>
+                  {['Usuário', 'E-mail', 'Perfil', 'Situação', 'Ação']
+                    .map((titulo) => (
+                      <th key={titulo} style={{
+                        textAlign: 'left',
+                        padding: 12,
+                        borderBottom: '2px solid var(--border)',
+                      }}>
+                        {titulo}
+                      </th>
+                    ))}
+                </tr>
+              </thead>
+              <tbody>
+                {usuarios.map((usuario) => (
+                  <tr key={usuario.id}>
+                    <td style={{ padding: 12 }}>
+                      {usuario.username}
+                    </td>
+                    <td style={{ padding: 12 }}>
+                      {usuario.email}
+                    </td>
+                    <td style={{ padding: 12 }}>
+                      {perfis[usuario.perfil] || 'Sem perfil'}
+                    </td>
+                    <td style={{ padding: 12 }}>
+                      {usuario.is_active ? 'Ativo' : 'Inativo'}
+                    </td>
+                    <td style={{ padding: 12 }}>
+                      <Button
+                        type="button"
+                        onClick={() => alterarSituacao(usuario)}
+                        style={btn({
+                          background: usuario.is_active
+                            ? '#8b3030'
+                            : '#2e7d5e',
+                          color: '#fff',
+                        })}
+                      >
+                        {usuario.is_active ? 'Desativar' : 'Ativar'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {usuarios.length === 0 && (
+              <p style={{ marginTop: 16 }}>
+                Nenhum usuário encontrado.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+};
 const Calendar = ({ calYear, setCalYear, calMonth, setCalMonth, selectedDay, setSelectedDay, onContinue, onVerAgenda }) => {
     const firstDay = new Date(calYear, calMonth, 1).getDay();
     const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -286,29 +550,31 @@ const corTipoAula = {
     ATPCG: { bg: '#f0f4ff', border: '#4e72b8', text: '#2a4a90' },
     Intervalo: { bg: '#f5f4f1', border: '#e8e4dc', text: '#6b6560' },
 };
-const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLocal, reservaFinalidade, setReservaFinalidade, calYear, setCalYear, calMonth, setCalMonth, selectedDay, setSelectedDay, setReservas, backToDash, user }) => {
+const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLocal, reservaFinalidade, setReservaFinalidade, calYear, setCalYear, calMonth, setCalMonth, selectedDay, setSelectedDay, recarregar, backToDash, user }) => {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [formTipo, setFormTipo] = useState('Lab. Móvel');
     const [reservaTurma, setReservaTurma] = useState('');
     const [confirmedSlot, setConfirmedSlot] = useState(null);
     const diaSemana = selectedDay ? new Date(calYear, calMonth, selectedDay).getDay() : 1;
     const grade = gradeParaDia(diaSemana);
-    const handleConfirmar = () => {
+    const handleConfirmar = async () => {
         if (!selectedSlot || !reservaLocal)
             return;
-        const novaReserva = {
-            id: Date.now(),
-            recurso: reservaLocal,
-            data: `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
-            horario: selectedSlot.horario,
-            finalidade: reservaFinalidade || 'Reserva',
-            turma: reservaTurma || undefined,
-            status: 'ativa',
-            usuario: user?.name || '',
-        };
-        setConfirmedSlot(selectedSlot);
-        setReservas(rs => [...rs, novaReserva]);
-        setReservaStep('success');
+        try {
+            await api.criarReserva({
+                recurso: reservaLocal,
+                data: `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
+                horario: selectedSlot.horario,
+                finalidade: reservaFinalidade || 'Reserva',
+                turma: reservaTurma || '',
+            });
+            await recarregar();
+            setConfirmedSlot(selectedSlot);
+            setReservaStep('success');
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
     const nomeDia = selectedDay
         ? `${WEEK[diaSemana]}, ${selectedDay} de ${MONTHS[calMonth]} de ${calYear}`
@@ -918,7 +1184,7 @@ const PERIODOS_LABEL = {
     4: '4ª aula (09h50–10h40)', 5: '5ª aula (10h40–11h30)', 6: '6ª aula (11h30–12h20)',
     7: '7ª aula (12h20–13h10)', 8: '8ª aula (13h10–14h00)', 9: '9ª aula (14h00–14h50)',
 };
-const PageCoordBloquear = ({ bloqueios, setBloqueios, backToDash }) => {
+const PageCoordBloquear = ({ bloqueios, recarregar, backToDash }) => {
     const [tipo, setTipo] = useState('Sala');
     const [recurso, setRecurso] = useState('');
     const [motivo, setMotivo] = useState('');
@@ -928,14 +1194,29 @@ const PageCoordBloquear = ({ bloqueios, setBloqueios, backToDash }) => {
         : tipo === 'Lab. Móvel' ? ['Plataforma de Recarga 1', 'Plataforma de Recarga 2', 'Plataforma de Recarga 3', 'Plataforma de Recarga 4']
             : HORARIOS;
     const fmtData = (d) => d ? d.split('-').reverse().join('/') : '';
-    const handleAplicar = () => {
+    const handleAplicar = async () => {
         if (!recurso)
             return;
-        setBloqueios(b => [...b, { id: Date.now(), tipo, recurso, motivo, data: data || undefined, aula: aula || undefined }]);
-        setRecurso('');
-        setMotivo('');
-        setData('');
-        setAula('');
+        try {
+            await api.criarBloqueio({ tipo, recurso, motivo, data: data || null, aula: aula || '' });
+            await recarregar();
+            setRecurso('');
+            setMotivo('');
+            setData('');
+            setAula('');
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
+    };
+    const handleDesbloquear = async (id) => {
+        try {
+            await api.removerBloqueio(id);
+            await recarregar();
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
     return (<main style={{ flex: 1, padding: '2.5rem 2rem', background: 'var(--secondary)' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -1009,7 +1290,7 @@ const PageCoordBloquear = ({ bloqueios, setBloqueios, backToDash }) => {
                   </p>
                   {b.motivo && <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>{b.motivo}</p>}
                 </div>
-                <Button variant="link" className="app-rb-button" onClick={() => setBloqueios(bs => bs.filter(x => x.id !== b.id))} style={{ ...btn({ background: '#2e7d5e', color: '#fff', padding: '7px 14px' }) }}>
+                <Button variant="link" className="app-rb-button" onClick={() => handleDesbloquear(b.id)} style={{ ...btn({ background: '#2e7d5e', color: '#fff', padding: '7px 14px' }) }}>
                   Desbloquear
                 </Button>
               </div>))}
@@ -1199,7 +1480,7 @@ const PageRelatorios = ({ reservas, bloqueios, backToDash }) => {
       </div>
     </main>);
 };
-const PageEquipamentos = ({ equipamentos, setEquipamentos, eqFilter, setEqFilter, backToDash }) => {
+const PageEquipamentos = ({ equipamentos, recarregar, eqFilter, setEqFilter, backToDash }) => {
     const [showForm, setShowForm] = useState(false);
     const [expandedId, setExpandedId] = useState(null);
     const [importMsg, setImportMsg] = useState('');
@@ -1209,12 +1490,26 @@ const PageEquipamentos = ({ equipamentos, setEquipamentos, eqFilter, setEqFilter
     const [form, setForm] = useState(emptyForm);
     const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
     const filtered = equipamentos.filter(e => !eqFilter || [e.patrimonio, e.simplificado, e.tipo, e.local, e.situacao, e.marca, e.modelo].some(v => v.toLowerCase().includes(eqFilter.toLowerCase())));
-    const updateSituacao = (id, sit) => setEquipamentos(eq => eq.map(e => e.id === id ? { ...e, situacao: sit } : e));
-    const handleSave = () => {
+    const updateSituacao = async (id, sit) => {
+        try {
+            await api.atualizarEquipamento(id, { situacao: sit });
+            await recarregar();
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
+    };
+    const handleSave = async () => {
         if (!form.patrimonio && !form.simplificado)
             return;
-        setEquipamentos(eq => [...eq, { ...form, id: Date.now() }]);
-        setForm(emptyForm);
+        try {
+            await api.criarEquipamento(form);
+            await recarregar();
+            setForm(emptyForm);
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
     const handleExportar = () => {
         const cabecalho = 'Nº Patrimônio,Nº Simplificado,Tipo,Marca,Modelo,Localização,Situação,Descrição';
@@ -1234,7 +1529,7 @@ const PageEquipamentos = ({ equipamentos, setEquipamentos, eqFilter, setEqFilter
         if (!file)
             return;
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
             const text = ev.target?.result;
             const linhas = text.split('\n').slice(1).filter(l => l.trim());
             const novos = [];
@@ -1251,7 +1546,15 @@ const PageEquipamentos = ({ equipamentos, setEquipamentos, eqFilter, setEqFilter
                 }
             });
             if (novos.length > 0) {
-                setEquipamentos(eq => [...eq, ...novos]);
+                try {
+                    await api.importarEquipamentos(novos.map(({ id, ...resto }) => resto));
+                    await recarregar();
+                }
+                catch (erro) {
+                    setImportMsg(erro.message);
+                    setTimeout(() => setImportMsg(''), 4000);
+                    return;
+                }
                 setImportMsg(`${novos.length} equipamento${novos.length !== 1 ? 's' : ''} importado${novos.length !== 1 ? 's' : ''} com sucesso.`);
             }
             else {
@@ -1355,7 +1658,7 @@ const PageEquipamentos = ({ equipamentos, setEquipamentos, eqFilter, setEqFilter
       </div>
     </main>);
 };
-const PageCadastroEspaco = ({ tipoProp, espacos, setEspacos, setBloqueios, backToDash }) => {
+const PageCadastroEspaco = ({ tipoProp, espacos, recarregar, backToDash }) => {
     const [tipoAtivo, setTipoAtivo] = useState(tipoProp);
     const tipo = tipoAtivo;
     const lista = espacos.filter(e => e.tipo === tipo);
@@ -1363,20 +1666,29 @@ const PageCadastroEspaco = ({ tipoProp, espacos, setEspacos, setBloqueios, backT
     const [expandedId, setExpandedId] = useState(null);
     const [form, setForm] = useState({ tipo, nome: '', localizacao: '', bloco: '', capacidade: '', descricao: '' });
     const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
-    const toggleBloqueio = (e) => {
+    const toggleBloqueio = async (e) => {
         const bloqueado = e.situacao === 'Indisponível';
-        setEspacos(es => es.map(x => x.id === e.id ? { ...x, situacao: bloqueado ? 'Disponível' : 'Indisponível' } : x));
-        if (bloqueado)
-            setBloqueios(bs => bs.filter(b => b.recurso !== e.nome));
-        else
-            setBloqueios(bs => [...bs, { id: Date.now(), tipo, recurso: e.nome, motivo: 'Manutenção/Indisponibilidade' }]);
+        try {
+            // O backend também cria/remove o bloqueio correspondente.
+            await api.atualizarEspaco(e.id, { situacao: bloqueado ? 'Disponível' : 'Indisponível' });
+            await recarregar();
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!form.nome)
             return;
-        setEspacos(es => [...es, { ...form, tipo, id: Date.now(), situacao: 'Disponível' }]);
-        setForm({ tipo, nome: '', localizacao: '', bloco: '', capacidade: '', descricao: '' });
-        setShowForm(false);
+        try {
+            await api.criarEspaco({ ...form, tipo });
+            await recarregar();
+            setForm({ tipo, nome: '', localizacao: '', bloco: '', capacidade: '', descricao: '' });
+            setShowForm(false);
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
     const tabLabel = (t) => t === 'Sala' ? '🏫 Salas' : t === 'Laboratório' ? '🔬 Laboratórios' : '🔋 Labs Móveis';
     const nomePlaceholder = tipo === 'Sala' ? 'Ex: Sala 06' : tipo === 'Laboratório' ? 'Ex: Lab de Robótica' : 'Ex: Plataforma 01';
@@ -1485,11 +1797,17 @@ const PageCadastroEspaco = ({ tipoProp, espacos, setEspacos, setBloqueios, backT
       </div>
     </main>);
 };
-const PagePatrimonio = ({ backToDash, reservas, bloqueios, setBloqueios, equipamentos, espacos }) => {
-    const [registros, setRegistros] = useState([
-        { id: 1, tipo: 'Equipamento', recurso: 'PR-01', inicio: '2026-09-27', previsao: '2026-10-10', motivo: 'Lâmpada queimada', situacao: 'Em manutenção' },
-        { id: 2, tipo: 'Sala', recurso: 'Sala 04', inicio: '2026-09-25', previsao: '2026-10-05', motivo: 'Reforma elétrica', situacao: 'Bloqueada' },
-    ]);
+const PagePatrimonio = ({ backToDash, reservas, bloqueios, recarregar, equipamentos, espacos }) => {
+    const [registros, setRegistros] = useState([]);
+    const carregarRegistros = useCallback(async () => {
+        try {
+            setRegistros(await api.listarManutencoes());
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
+    }, []);
+    useEffect(() => { carregarRegistros(); }, [carregarRegistros]);
     const [showForm, setShowForm] = useState(false);
     const emptyForm = { tipo: 'Equipamento', recurso: '', inicio: '', previsao: '', motivo: '' };
     const [form, setForm] = useState(emptyForm);
@@ -1504,26 +1822,34 @@ const PagePatrimonio = ({ backToDash, reservas, bloqueios, setBloqueios, equipam
     const afetadas = reservas.filter(r => r.status === 'ativa' && r.recurso === form.recurso);
     const fmtDate = (d) => d ? d.split('-').reverse().join('/') : '—';
     const fmtRange = (ini, pre) => ini && pre ? `${fmtDate(ini)} – ${fmtDate(pre)}` : ini ? fmtDate(ini) : '—';
-    const handleBloquear = () => {
+    const handleBloquear = async () => {
         if (!form.recurso)
             return;
-        const novo = {
-            id: Date.now(), tipo: form.tipo, recurso: form.recurso,
-            inicio: form.inicio || new Date().toISOString().split('T')[0],
-            previsao: form.previsao, motivo: form.motivo,
-            situacao: 'Em manutenção',
-        };
-        setRegistros(rs => [novo, ...rs]);
-        setBloqueios(bs => [...bs, { id: Date.now(), tipo: form.tipo, recurso: form.recurso, motivo: form.motivo || 'Manutenção' }]);
-        setForm(emptyForm);
-        setNotifSent(false);
-        setShowForm(false);
+        try {
+            await api.criarManutencao({
+                tipo: form.tipo, recurso: form.recurso,
+                inicio: form.inicio || new Date().toISOString().split('T')[0],
+                previsao: form.previsao || null, motivo: form.motivo,
+            });
+            await Promise.all([carregarRegistros(), recarregar()]);
+            setForm(emptyForm);
+            setNotifSent(false);
+            setShowForm(false);
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
-    const updateSit = (id, sit) => setRegistros(rs => rs.map(r => r.id === id ? { ...r, situacao: sit } : r));
-    const desbloquear = (reg) => {
-        setRegistros(rs => rs.map(r => r.id === reg.id ? { ...r, situacao: 'Concluída' } : r));
-        setBloqueios(bs => bs.filter(b => b.recurso !== reg.recurso));
+    const updateSit = async (id, sit) => {
+        try {
+            await api.atualizarManutencao(id, { situacao: sit });
+            await Promise.all([carregarRegistros(), recarregar()]);
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
     };
+    const desbloquear = (reg) => updateSit(reg.id, 'Concluída');
     const sitColors = {
         'Em manutenção': { bg: '#c4843a22', text: '#c4843a' },
         'Bloqueada': { bg: '#c4843a22', text: '#c4843a' },
@@ -1675,51 +2001,39 @@ export default function App() {
     const [loginErro, setLoginErro] = useState('');
 const [loginCarregando, setLoginCarregando] = useState(false);
 
-const fazerLogin = async () => {
-  setLoginErro('');
-  setLoginCarregando(true);
-
-  try {
-   const respostaCsrf = await fetch('http://127.0.0.1:8000/api/csrf/', {
-  credentials: 'include',
-});
-const dadosCsrf = await respostaCsrf.json();
- const resposta = await 
- fetch('http://127.0.0.1:8000/api/login/', {
-      method: 'POST',
-      headers: {
-  'Content-Type': 'application/json',
-  'X-CSRFToken': dadosCsrf.csrfToken,
-},
-      credentials: 'include',
-      body: JSON.stringify({
-        email: loginEmail,
-        senha: loginPassword,
-      }),
-    });
-
-    const dados = await resposta.json();
-
-    if (!resposta.ok) {
-      setLoginErro(dados.erro || 'Não foi possível entrar.');
-      return;
-    }
-
-    setUser({
-      name: dados.usuario.nome,
-      email: dados.usuario.email,
-      role: dados.usuario.perfil,
-    });
-
-    setLoginOpen(false);
-    setPage('dashboard');
-  } catch {
-    setLoginErro('Não foi possível conectar ao servidor Django.');
-  } finally {
-    setLoginCarregando(false);
-  }
+    const fazerLogin = async () => {
+        setLoginErro('');
+        setLoginCarregando(true);
+        try {
+            const dados = await api.login(loginEmail, loginPassword);
+            setUser({
+                name: dados.usuario.nome,
+                email: dados.usuario.email,
+                role: dados.usuario.perfil,
+            });
+            setLoginOpen(false);
+            setPage('dashboard');
+        }
+        catch (erro) {
+            setLoginErro(erro.message || 'Não foi possível entrar.');
+        }
+        finally {
+            setLoginCarregando(false);
+        }
+    };
+    const fazerLogout = async () => {
+      try {
+        await api.logout();
+      } catch (erro) {
+        console.error('Erro ao encerrar a sessão:', erro);
+      } finally {
+        setUser(null);
+        setPage('home');
+        setProfileOpen(false);
+        setLoginPassword('');
+        setLoginErro('');
+     }
 };
-    const [loginRole, setLoginRole] = useState('professor');
     const [registerOpen, setRegisterOpen] = useState(false);
     const [registerStep, setRegisterStep] = useState('form');
     const [registerEmail, setRegisterEmail] = useState('');
@@ -1752,15 +2066,39 @@ const dadosCsrf = await respostaCsrf.json();
     const [reservaLocal, setReservaLocal] = useState('');
     const [reservaHora, setReservaHora] = useState('');
     const [reservaFinalidade, setReservaFinalidade] = useState('');
-    const [reservas, setReservas] = useState(mockReservas);
+    const [reservas, setReservas] = useState([]);
     const [filterRecurso, setFilterRecurso] = useState('');
     const [filterUsuario, setFilterUsuario] = useState('');
-    const [bloqueios, setBloqueios] = useState([{ id: 1, tipo: 'Sala', recurso: 'Sala 04', motivo: 'Reforma elétrica' }]);
+    const [bloqueios, setBloqueios] = useState([]);
     const [novoBloquTipo, setNovoBloquTipo] = useState('Sala');
     const [novoBloquRecurso, setNovoBloquRecurso] = useState('');
     const [novoBloquMotivo, setNovoBloquMotivo] = useState('');
-    const [espacos, setEspacos] = useState(mockEspacos);
-    const [equipamentos, setEquipamentos] = useState(mockEquipamentos);
+    const [espacos, setEspacos] = useState([]);
+    const [equipamentos, setEquipamentos] = useState([]);
+    // Busca no Django tudo que as telas mostram. Chamada ao entrar e após cada alteração.
+    const recarregarDados = useCallback(async () => {
+        try {
+            const dados = await api.carregarTudo();
+            setEspacos(dados.espacos);
+            setEquipamentos(dados.equipamentos);
+            setReservas(dados.reservas);
+            setBloqueios(dados.bloqueios);
+        }
+        catch (erro) {
+            if (erro.status === 401 || erro.status === 403) {
+                // Sessão expirada no servidor: volta para a página inicial.
+                setUser(null);
+                setPage('home');
+            }
+            else {
+                console.warn('Falha ao carregar dados do servidor.', erro);
+            }
+        }
+    }, []);
+    useEffect(() => {
+        if (user)
+            recarregarDados();
+    }, [user?.email, recarregarDados]);
     const [eqFilter, setEqFilter] = useState('');
     // Persiste a sessão. Ao sair, apaga usuário e página salva.
     useEffect(() => {
@@ -1806,9 +2144,22 @@ const dadosCsrf = await respostaCsrf.json();
     useEffect(() => { const t = setInterval(next, 5000); return () => clearInterval(t); }, [next]);
     const goPage = (p) => setPage(p);
     const backToDash = () => setPage('dashboard');
-    const roleLabel = { professor: 'Professor', coordenacao: 'Coordenação', secretaria: 'Secretaria' };
+    const roleLabel = {
+      professor: 'Professor',
+      coordenacao: 'Coordenação',
+      secretaria: 'Secretaria',
+      administrador: 'Administrador TI',
+    };
     const roleNames = { professor: 'Maria Silva', coordenacao: 'Carlos Mendes', secretaria: 'Fernanda Costa' };
-    const cancelReserva = (id) => setReservas(rs => rs.map(r => r.id === id ? { ...r, status: 'cancelada' } : r));
+    const cancelReserva = async (id) => {
+        try {
+            await api.cancelarReserva(id);
+            await recarregarDados();
+        }
+        catch (erro) {
+            api.avisarErro(erro);
+        }
+    };
     const profCards = [
         { label: 'Solicitar Reserva', icon: '📅', color: '#1a3a5c', desc: 'Reserve salas, labs e equipamentos', action: () => { goPage('reserva'); setReservaStep('calendar'); setSelectedDay(null); } },
         { label: 'Minhas Reservas', icon: '📋', color: '#c4843a', desc: 'Visualize e cancele suas reservas', action: () => goPage('minhas-reservas') },
@@ -1825,7 +2176,25 @@ const dadosCsrf = await respostaCsrf.json();
         { label: 'Equipamentos e Patrimônio', icon: '💻', color: '#c4843a', desc: 'Patrimônio, manutenção e situação (RF24-RF37)', action: () => goPage('sec-equipamentos') },
         { label: 'Histórico e Manutenção', icon: '🔧', color: '#6b3fa0', desc: 'Registre e acompanhe manutenções (RF31-RF32)', action: () => goPage('sec-patrimonio') },
     ];
-    const dashCards = user?.role === 'professor' ? profCards : user?.role === 'coordenacao' ? coordCards : secCards;
+    const adminCards = [
+  {
+    label: 'Gerenciar Usuários',
+    desc: 'Cadastrar e administrar as contas de acesso ao sistema.',
+    icon: '👥',
+    color: '#34495e',
+    action: () => setPage('admin-usuarios'),
+  },
+];
+    const dashCards =
+      user?.role === 'professor'
+        ? profCards
+        : user?.role === 'coordenacao'
+          ? coordCards
+          : user?.role === 'secretaria'
+            ? secCards
+            : user?.role === 'administrador'
+            ? adminCards
+          : [];
     return (<div className="app-shell" style={{ background: 'var(--background)', fontFamily: 'var(--font-body)' }}>
 
       {/* HEADER */}
@@ -1849,7 +2218,7 @@ const dadosCsrf = await respostaCsrf.json();
                   <p style={{ fontSize: '0.78rem', fontWeight: 600, margin: 0 }}>{user.name}</p>
                   <p style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', margin: '2px 0 0' }}>{roleLabel[user.role]}</p>
                 </div>
-                {[{ label: 'Alterar Cadastro', action: () => setProfileOpen(false) }, { label: 'Sair', action: () => { setUser(null); setPage('home'); setProfileOpen(false); } }].map(({ label: l, action }) => (<Button variant="link" className="app-rb-button" key={l} onClick={action} style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: l === 'Sair' ? '#c0392b' : 'var(--foreground)', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--secondary)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>{l}</Button>))}
+                {[{ label: 'Alterar Cadastro', action: () => setProfileOpen(false) }, { label: 'Sair', action: fazerLogout }].map(({ label: l, action }) => (<Button variant="link" className="app-rb-button" key={l} onClick={action} style={{ width: '100%', padding: '11px 16px', background: 'none', border: 'none', fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: l === 'Sair' ? '#c0392b' : 'var(--foreground)', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--secondary)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>{l}</Button>))}
               </div>)}
           </div>) : (<Button variant="link" className="app-rb-button" onClick={() => setLoginOpen(true)} style={{ ...btn({ background: 'var(--primary)', color: '#fff', border: '2px solid var(--primary)' }) }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}>
             Login
@@ -1871,16 +2240,21 @@ const dadosCsrf = await respostaCsrf.json();
           </div>
         </main>)}
 
-      {page === 'reserva' && user && <PageReserva reservaStep={reservaStep} setReservaStep={setReservaStep} reservaLocal={reservaLocal} setReservaLocal={setReservaLocal} reservaFinalidade={reservaFinalidade} setReservaFinalidade={setReservaFinalidade} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth} selectedDay={selectedDay} setSelectedDay={setSelectedDay} setReservas={setReservas} backToDash={backToDash} user={user}/>}
+      {page === 'reserva' && user && <PageReserva reservaStep={reservaStep} setReservaStep={setReservaStep} reservaLocal={reservaLocal} setReservaLocal={setReservaLocal} reservaFinalidade={reservaFinalidade} setReservaFinalidade={setReservaFinalidade} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth} selectedDay={selectedDay} setSelectedDay={setSelectedDay} recarregar={recarregarDados} backToDash={backToDash} user={user}/>}
       {page === 'minhas-reservas' && user && <PageMinhasReservas reservas={reservas} user={user} cancelReserva={cancelReserva} backToDash={backToDash} onVerAgenda={d => { setAgendaDate(d); setAgendaFrom('minhas-reservas'); goPage('agenda'); }}/>}
       {page === 'consultar' && user && <PageConsultar equipamentos={equipamentos} bloqueios={bloqueios} reservas={reservas} backToDash={backToDash}/>}
       {page === 'coord-reservas' && user && <PageCoordReservas reservas={reservas} filterRecurso={filterRecurso} setFilterRecurso={setFilterRecurso} filterUsuario={filterUsuario} setFilterUsuario={setFilterUsuario} cancelReserva={cancelReserva} backToDash={backToDash} onSolicitarReserva={() => { goPage('reserva'); setReservaStep('calendar'); setSelectedDay(null); }} onVerAgenda={d => { setAgendaDate(d); setAgendaFrom('coord-reservas'); goPage('agenda'); }}/>}
       {page === 'agenda' && user && <PageAgenda data={agendaDate} reservas={reservas} onBack={() => setPage(agendaFrom)}/>}
-      {page === 'coord-bloquear' && user && <PageCoordBloquear bloqueios={bloqueios} setBloqueios={setBloqueios} backToDash={backToDash}/>}
+      {page === 'coord-bloquear' && user && <PageCoordBloquear bloqueios={bloqueios} recarregar={recarregarDados} backToDash={backToDash}/>}
       {page === 'coord-relatorios' && user && <PageRelatorios reservas={reservas} bloqueios={bloqueios} backToDash={backToDash}/>}
-      {page === 'sec-equipamentos' && user && <PageEquipamentos equipamentos={equipamentos} setEquipamentos={setEquipamentos} eqFilter={eqFilter} setEqFilter={setEqFilter} backToDash={backToDash}/>}
-      {(page === 'sec-salas' || page === 'sec-labs') && user && <PageCadastroEspaco tipoProp={page === 'sec-labs' ? 'Laboratório' : 'Sala'} espacos={espacos} setEspacos={setEspacos} setBloqueios={setBloqueios} backToDash={backToDash}/>}
-      {page === 'sec-patrimonio' && user && <PagePatrimonio backToDash={backToDash} reservas={reservas} bloqueios={bloqueios} setBloqueios={setBloqueios} equipamentos={equipamentos} espacos={espacos}/>}
+      {page === 'sec-equipamentos' && user && <PageEquipamentos equipamentos={equipamentos} recarregar={recarregarDados} eqFilter={eqFilter} setEqFilter={setEqFilter} backToDash={backToDash}/>}
+      {(page === 'sec-salas' || page === 'sec-labs') && user && <PageCadastroEspaco tipoProp={page === 'sec-labs' ? 'Laboratório' : 'Sala'} espacos={espacos} recarregar={recarregarDados} backToDash={backToDash}/>}
+      {page === 'sec-patrimonio' && user && <PagePatrimonio backToDash={backToDash} reservas={reservas} bloqueios={bloqueios} recarregar={recarregarDados} equipamentos={equipamentos} espacos={espacos}/>}
+      {page === 'admin-usuarios' && user?.role === 'administrador' && (
+        <PageAdminUsuarios
+          backToDash={() => setPage('dashboard')}
+        />
+      )}
 
       {/* HOME CAROUSEL */}
       {page === 'home' && (<>
@@ -1920,17 +2294,14 @@ const dadosCsrf = await respostaCsrf.json();
           <div style={{ background: 'var(--background)', border: '2px solid var(--foreground)', borderRadius: '4px', padding: '2.5rem 2rem', width: '100%', maxWidth: '400px', position: 'relative' }} onClick={e => e.stopPropagation()}>
             <Button variant="link" className="app-rb-button" onClick={() => setLoginOpen(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'var(--muted-foreground)' }}>✕</Button>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.25rem' }}>Acesso ao Sistema</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>RF01 · Entre com suas credenciais institucionais.</p>            <div style={{ marginBottom: '1rem' }}><label style={label}>Perfil de Acesso (RF38)</label>
-              <select style={selectStyle} value={loginRole} onChange={e => setLoginRole(e.target.value)}>
-                <option value="professor">Professor</option><option value="coordenacao">Coordenação</option><option value="secretaria">Secretaria</option>
-              </select>
-            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>RF01 · Entre com suas credenciais institucionais.</p>
             <div style={{ marginBottom: '1rem' }}><label style={label}>E-mail</label><input type="email" placeholder="usuario@escola.edu.br" onChange={e => setLoginEmail(e.target.value)} style={field}/></div>
             <div style={{ marginBottom: '0.5rem' }}><label style={label}>Senha</label> <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" style={field}/></div>
             <div style={{ textAlign: 'right', marginBottom: '1.25rem' }}>
               <Button variant="link" className="app-rb-button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-body)', textDecoration: 'underline', padding: 0 }}>Esqueceu a senha?</Button>
             </div>
-            <Button variant="link" className="app-rb-button" onClick={fazerLogin} style={{ ...btn({ width: '100%', background: 'var(--primary)', color: '#fff' }) }}>Entrar</Button>            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '1.25rem 0' }}>
+            {loginErro && (<p role="alert" style={{ color: '#c0392b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{loginErro}</p>)}
+            <Button variant="link" className="app-rb-button" onClick={fazerLogin} disabled={loginCarregando} style={{ ...btn({ width: '100%', background: 'var(--primary)', color: '#fff' }) }}>{loginCarregando ? 'Entrando...' : 'Entrar'}</Button>            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '1.25rem 0' }}>
               <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}/>
               <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>ou entre com</span>
               <div style={{ flex: 1, height: '1px', background: 'var(--border)' }}/>
