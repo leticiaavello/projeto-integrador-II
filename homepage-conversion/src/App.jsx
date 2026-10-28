@@ -85,11 +85,19 @@ const MONTHS = [
 ];
 const WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const HORARIOS = [
-    '07h00-08h00', '08h00-09h00', '09h00-10h00', '10h00-11h00',
+    '07h30-08h20', '08h00-09h00', '09h00-10h00', '10h00-11h00',
     '11h00-12h00', '13h00-14h00', '14h00-15h00', '15h00-16h00', '16h00-17h00',
 ];
-const SALAS = ['Sala 01', 'Sala 02', 'Sala 03', 'Sala 04', 'Sala 05', 'Auditório', 'Quadra Poliesportiva'];
-const LABS = ['Laboratório de Informática', 'Laboratório de Ciências', 'Laboratório de Química', 'Laboratório de Física'];
+// Recursos são carregados exclusivamente do Django/PostgreSQL.
+const nomesEspacos = (espacos, tipo) => espacos.filter(e => e.tipo === tipo && e.situacao === 'Disponível').map(e => e.nome);
+const nomeEquipamento = e => e.tipo + ' — ' + (e.patrimonio || e.simplificado || String(e.id));
+const nomesEquipamentos = equipamentos => equipamentos.filter(e => e.situacao === 'Disponível').map(nomeEquipamento);
+const recursosPorTipo = (espacos, equipamentos) => ({
+    'Sala': nomesEspacos(espacos, 'Sala'),
+    'Laboratório': nomesEspacos(espacos, 'Laboratório'),
+    'Lab. Móvel': nomesEspacos(espacos, 'Lab. Móvel'),
+    'Equipamento': nomesEquipamentos(equipamentos),
+});
 const mockReservas = [
     { id: 1, recurso: 'Sala 01', data: '2026-10-02', horario: '08h00-09h00', finalidade: 'Aula de Matemática', status: 'ativa', usuario: 'Maria Silva' },
     { id: 2, recurso: 'Laboratório de Informática', data: '2026-10-03', horario: '10h00-11h00', finalidade: 'Aula de TI', status: 'ativa', usuario: 'Maria Silva' },
@@ -230,7 +238,7 @@ const Breadcrumb = ({ label: lbl, onBack }) => (<div style={{ display: 'flex', a
     <span style={{ color: 'var(--muted-foreground)', fontSize: '0.8rem' }}>›</span>
     <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>{lbl}</span>
   </div>);
-
+  
 const PageAdminUsuarios = ({ backToDash }) => {
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -538,19 +546,13 @@ const Calendar = ({ calYear, setCalYear, calMonth, setCalMonth, selectedDay, set
       </div>
     </div>);
 };
-const RECURSOS_POR_TIPO = {
-    'Lab. Móvel': ['Plataforma de Recarga 1', 'Plataforma de Recarga 2', 'Plataforma de Recarga 3', 'Plataforma de Recarga 4'],
-    'Sala': SALAS,
-    'Laboratório': LABS,
-    'Equipamento': ['Projetor', 'Webcam', 'Caixa de Som', 'Microfone', 'Smart TV', 'Nobreak'],
-};
 const corTipoAula = {
     Aula: { bg: '#f0f4f8', border: '#c8c2b8', text: '#1a1a2e' },
     Tutoria: { bg: '#fff7ed', border: '#c4843a', text: '#92510a' },
     ATPCG: { bg: '#f0f4ff', border: '#4e72b8', text: '#2a4a90' },
     Intervalo: { bg: '#f5f4f1', border: '#e8e4dc', text: '#6b6560' },
 };
-const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLocal, reservaFinalidade, setReservaFinalidade, calYear, setCalYear, calMonth, setCalMonth, selectedDay, setSelectedDay, recarregar, backToDash, user }) => {
+const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLocal, reservaFinalidade, setReservaFinalidade, calYear, setCalYear, calMonth, setCalMonth, selectedDay, setSelectedDay, recarregar, backToDash, user, espacos, equipamentos }) => {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [formTipo, setFormTipo] = useState('Lab. Móvel');
     const [reservaTurma, setReservaTurma] = useState('');
@@ -583,7 +585,7 @@ const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLoca
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
         <Breadcrumb label="Solicitar Reserva" onBack={backToDash}/>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Solicitar Reserva</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '2rem' }}>RF03-RF08 · Selecione a data e a aula desejada.</p>
+        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '2rem' }}>· Selecione a data e a aula desejada.</p>
 
         {reservaStep === 'success' ? (<div style={{ background: 'var(--background)', border: '2px solid var(--foreground)', borderRadius: '4px', padding: '3rem 2rem', textAlign: 'center' }}>
             <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#2e7d5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
@@ -692,7 +694,7 @@ const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLoca
                             <label style={label}>Recurso</label>
                             <select style={selectStyle} value={reservaLocal} onChange={e => setReservaLocal(e.target.value)}>
                               <option value="">Selecione...</option>
-                              {(RECURSOS_POR_TIPO[formTipo] || []).map(o => <option key={o} value={o}>{o}</option>)}
+                              {(recursosPorTipo(espacos, equipamentos)[formTipo] || []).map(o => <option key={o} value={o}>{o}</option>)}
                             </select>
                           </div>
                         </div>
@@ -708,7 +710,7 @@ const PageReserva = ({ reservaStep, setReservaStep, reservaLocal, setReservaLoca
                         </div>
 
                         <p style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', marginBottom: '1rem', padding: '7px 12px', background: 'var(--secondary)', borderRadius: '2px', borderLeft: '3px solid var(--accent)' }}>
-                          RF07-RF08: A disponibilidade será verificada antes de confirmar.
+                          A disponibilidade será verificada antes de confirmar.
                         </p>
 
                         <div style={{ display: 'flex', gap: '10px' }}>
@@ -878,7 +880,7 @@ const PageMinhasReservas = ({ reservas, user, cancelReserva, backToDash, onVerAg
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         <Breadcrumb label="Minhas Reservas" onBack={backToDash}/>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Minhas Reservas</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>RF09-RF10 · Consulte e cancele suas reservas.</p>
+        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>· Consulte e cancele suas reservas.</p>
 
         {/* Painel de filtros */}
         <div style={{ background: 'var(--background)', border: '2px solid var(--border)', borderRadius: '4px', padding: '1.25rem 1.5rem', marginBottom: '1.25rem' }}>
@@ -958,7 +960,7 @@ const PageMinhasReservas = ({ reservas, user, cancelReserva, backToDash, onVerAg
       </div>
     </main>);
 };
-const PageConsultar = ({ equipamentos, bloqueios, reservas, backToDash }) => {
+const PageConsultar = ({ espacos, equipamentos, bloqueios, reservas, backToDash }) => {
     const [tipo, setTipo] = useState('salas');
     const [filterData, setFilterData] = useState('');
     const [filterNome, setFilterNome] = useState('');
@@ -966,11 +968,11 @@ const PageConsultar = ({ equipamentos, bloqueios, reservas, backToDash }) => {
     const fmtData = (d) => d ? d.split('-').reverse().join('/') : '';
     const activeFilters = [filterData, filterNome].filter(Boolean).length;
     const clearAll = () => { setFilterData(''); setFilterNome(''); };
-    const baseList = tipo === 'salas' ? SALAS : tipo === 'labs' ? LABS : equipamentos.map(e => e.tipo + ' — ' + (e.patrimonio || e.simplificado || String(e.id)));
+    const baseList = tipo === 'salas' ? nomesEspacos(espacos, 'Sala') : tipo === 'labs' ? nomesEspacos(espacos, 'Laboratório') : nomesEquipamentos(equipamentos);
     const lista = baseList.filter(item => !filterNome || item.toLowerCase().includes(filterNome.toLowerCase()));
     // For equip mode, keep a parallel array with ids so keys are unique
     const equipFiltered = tipo === 'equip'
-        ? equipamentos.filter(e => !filterNome || (e.tipo + ' — ' + (e.patrimonio || e.simplificado || String(e.id))).toLowerCase().includes(filterNome.toLowerCase()))
+        ? equipamentos.filter(e => e.situacao === 'Disponível' && (!filterNome || nomeEquipamento(e).toLowerCase().includes(filterNome.toLowerCase())))
         : [];
     const colors = { 'Disponível': '#2e7d5e', 'Reservado': '#c4843a', 'Bloqueado': '#c0392b' };
     const getStatus = (item) => {
@@ -989,7 +991,7 @@ const PageConsultar = ({ equipamentos, bloqueios, reservas, backToDash }) => {
       <div style={{ maxWidth: '860px', margin: '0 auto' }}>
         <Breadcrumb label="Consultar Disponibilidade" onBack={backToDash}/>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Consultar Disponibilidade</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>RF02, RF39 · Disponibilidade atualizada em tempo real.</p>
+        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>· Disponibilidade atualizada em tempo real.</p>
 
         {/* Tipo de recurso — segmentado */}
         <div style={{ marginBottom: '1.25rem' }}>
@@ -1097,7 +1099,7 @@ const PageCoordReservas = ({ reservas, filterRecurso, setFilterRecurso, filterUs
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Gerenciar Reservas</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>RF11-RF13, RF18-RF19 · Visualize, filtre e gerencie todas as reservas.</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>· Visualize, filtre e gerencie todas as reservas.</p>
           </div>
           <Button variant="link" className="app-rb-button" onClick={onSolicitarReserva} style={{ ...btn({ background: 'var(--primary)', color: '#fff' }) }} onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--primary)'}>
             📅 Solicitar Reserva
@@ -1184,15 +1186,13 @@ const PERIODOS_LABEL = {
     4: '4ª aula (09h50–10h40)', 5: '5ª aula (10h40–11h30)', 6: '6ª aula (11h30–12h20)',
     7: '7ª aula (12h20–13h10)', 8: '8ª aula (13h10–14h00)', 9: '9ª aula (14h00–14h50)',
 };
-const PageCoordBloquear = ({ bloqueios, recarregar, backToDash }) => {
+const PageCoordBloquear = ({ bloqueios, recarregar, backToDash, espacos, equipamentos }) => {
     const [tipo, setTipo] = useState('Sala');
     const [recurso, setRecurso] = useState('');
     const [motivo, setMotivo] = useState('');
     const [data, setData] = useState('');
     const [aula, setAula] = useState('');
-    const recursoOpts = tipo === 'Sala' ? SALAS : tipo === 'Laboratório' ? LABS
-        : tipo === 'Lab. Móvel' ? ['Plataforma de Recarga 1', 'Plataforma de Recarga 2', 'Plataforma de Recarga 3', 'Plataforma de Recarga 4']
-            : HORARIOS;
+    const recursoOpts = recursosPorTipo(espacos, equipamentos)[tipo] || [];
     const fmtData = (d) => d ? d.split('-').reverse().join('/') : '';
     const handleAplicar = async () => {
         if (!recurso)
@@ -1222,7 +1222,7 @@ const PageCoordBloquear = ({ bloqueios, recarregar, backToDash }) => {
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         <Breadcrumb label="Bloquear Recursos" onBack={backToDash}/>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Bloquear Recursos</h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '2rem' }}>RF14-RF17 · Bloqueie e desbloqueie horários, salas, laboratórios e equipamentos.</p>
+        <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '2rem' }}>· Bloqueie e desbloqueie horários, salas, laboratórios e equipamentos.</p>
 
         {/* Formulário */}
         <div style={{ background: 'var(--background)', border: '2px solid var(--foreground)', borderRadius: '4px', padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -1298,7 +1298,7 @@ const PageCoordBloquear = ({ bloqueios, recarregar, backToDash }) => {
       </div>
     </main>);
 };
-const PageRelatorios = ({ reservas, bloqueios, backToDash }) => {
+const PageRelatorios = ({ reservas, bloqueios, backToDash, espacos }) => {
     const [filterTipo, setFilterTipo] = useState('todos');
     const [filterDataIni, setFilterDataIni] = useState('');
     const [filterDataFim, setFilterDataFim] = useState('');
@@ -1309,11 +1309,8 @@ const PageRelatorios = ({ reservas, bloqueios, backToDash }) => {
     const activeFilters = [filterTipo !== 'todos' ? filterTipo : '', filterDataIni, filterDataFim, filterPeriodo].filter(Boolean).length;
     const clearAll = () => { setFilterTipo('todos'); setFilterDataIni(''); setFilterDataFim(''); setFilterPeriodo(''); setGerado(false); };
     const tipoDoRecurso = (recurso) => {
-        if (LABS.some(l => recurso.includes(l) || l.includes(recurso)))
-            return 'Laboratório';
-        if (SALAS.some(s => recurso.includes(s) || s.includes(recurso)))
-            return 'Sala';
-        return 'Equipamento';
+        const espaco = espacos.find(e => e.nome === recurso);
+        return espaco ? espaco.tipo : 'Equipamento';
     };
     const filtered = reservas.filter(r => {
         if (filterTipo !== 'todos' && tipoDoRecurso(r.recurso) !== filterTipo)
@@ -1351,7 +1348,7 @@ const PageRelatorios = ({ reservas, bloqueios, backToDash }) => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Relatórios de Utilização</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>RF21 · Histórico e estatísticas de uso dos recursos.</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>· Histórico e estatísticas de uso dos recursos.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <Button variant="link" className="app-rb-button" onClick={() => setGerado(true)} style={{ ...btn({ background: 'var(--primary)', color: '#fff' }) }} onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--primary)'}>
@@ -1572,7 +1569,7 @@ const PageEquipamentos = ({ equipamentos, recarregar, eqFilter, setEqFilter, bac
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Equipamentos e Patrimônio</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>RF24-RF37 · Patrimônio, tipo, localização, situação e manutenção.</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>· Patrimônio, tipo, localização, situação e manutenção.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <Button variant="link" className="app-rb-button" onClick={handleExportar} style={{ ...btn({ background: 'none', color: 'var(--foreground)', border: '2px solid var(--border)' }) }} onMouseEnter={e => e.currentTarget.style.background = 'var(--secondary)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
@@ -1604,11 +1601,11 @@ const PageEquipamentos = ({ equipamentos, recarregar, eqFilter, setEqFilter, bac
         {showForm && (<div style={{ background: 'var(--background)', border: '2px solid var(--foreground)', borderRadius: '4px', padding: '1.75rem', marginBottom: '1.75rem' }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem' }}>🖥️ Novo Equipamento</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1rem' }}>
-              <div><label style={label}>Nº de Patrimônio (RF25)</label><input style={field} placeholder="Ex: 0012349" value={form.patrimonio} onChange={e => setF('patrimonio', e.target.value)}/></div>
-              <div><label style={label}>Nº Simplificado (RF26)</label><input style={field} placeholder="Ex: NB-05" value={form.simplificado} onChange={e => setF('simplificado', e.target.value)}/></div>
+              <div><label style={label}>Nº de Patrimônio</label><input style={field} placeholder="Ex: 0012349" value={form.patrimonio} onChange={e => setF('patrimonio', e.target.value)}/></div>
+              <div><label style={label}>Nº Simplificado</label><input style={field} placeholder="Ex: NB-05" value={form.simplificado} onChange={e => setF('simplificado', e.target.value)}/></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '1rem' }}>
-              <div><label style={label}>Tipo (RF27)</label>
+              <div><label style={label}>Tipo</label>
                 <select style={selectStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                   <option value="">Selecione...</option>
                   {['Notebook', 'Computador', 'Projetor', 'TV', 'Tablet', 'Roteador', 'Câmera', 'Impressora', 'Outro'].map(t => <option key={t} value={t}>{t}</option>)}
@@ -1618,8 +1615,8 @@ const PageEquipamentos = ({ equipamentos, recarregar, eqFilter, setEqFilter, bac
               <div><label style={label}>Modelo</label><input style={field} placeholder="Ex: Aspire 5" value={form.modelo} onChange={e => setF('modelo', e.target.value)}/></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '1rem' }}>
-              <div><label style={label}>Localização (RF27)</label><input style={field} placeholder="Ex: Sala 01, Lab Informática..." value={form.local} onChange={e => setF('local', e.target.value)}/></div>
-              <div><label style={label}>Situação (RF30)</label>
+              <div><label style={label}>Localização</label><input style={field} placeholder="Ex: Sala 01, Lab Informática..." value={form.local} onChange={e => setF('local', e.target.value)}/></div>
+              <div><label style={label}>Situação</label>
                 <select style={selectStyle} value={form.situacao} onChange={e => setF('situacao', e.target.value)}>
                   {['Disponível', 'Em manutenção', 'Indisponível', 'Fora de uso'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -1631,7 +1628,7 @@ const PageEquipamentos = ({ equipamentos, recarregar, eqFilter, setEqFilter, bac
               <Button variant="link" className="app-rb-button" onClick={handleSave} style={{ ...btn({ background: 'var(--primary)', color: '#fff' }) }} onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--primary)'}>Salvar Equipamento</Button>
             </div>
           </div>)}
-        <div style={{ marginBottom: '1.25rem' }}><label style={label}>Pesquisar (RF29)</label><input style={field} placeholder="Patrimônio, simplificado, tipo, local, situação..." value={eqFilter} onChange={e => setEqFilter(e.target.value)}/></div>
+        <div style={{ marginBottom: '1.25rem' }}><label style={label}>Pesquisar</label><input style={field} placeholder="Patrimônio, simplificado, tipo, local, situação..." value={eqFilter} onChange={e => setEqFilter(e.target.value)}/></div>
         {filtered.length === 0 && <p style={{ color: 'var(--muted-foreground)', textAlign: 'center', padding: '3rem' }}>Nenhum equipamento encontrado.</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filtered.map(eq => (<div key={eq.id} style={{ background: 'var(--background)', border: `2px solid ${eq.situacao === 'Indisponível' || eq.situacao === 'Fora de uso' ? '#c0392b44' : eq.situacao === 'Em manutenção' ? '#c4843a44' : 'var(--border)'}`, borderRadius: '4px', overflow: 'hidden' }}>
@@ -1700,7 +1697,7 @@ const PageCadastroEspaco = ({ tipoProp, espacos, recarregar, backToDash }) => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Salas e Laboratórios</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>RF22-RF23, RF34-RF35 · Gerencie os espaços cadastrados.</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>· Gerencie os espaços cadastrados.</p>
           </div>
           <Button variant="link" className="app-rb-button" onClick={() => setShowForm(s => !s)} style={{ ...btn({ background: showForm ? 'var(--muted)' : 'var(--primary)', color: '#fff' }) }}>
             {showForm ? '✕ Cancelar' : `+ Novo ${tipo === 'Lab. Móvel' ? 'Lab. Móvel' : tipo}`}
@@ -1861,7 +1858,7 @@ const PagePatrimonio = ({ backToDash, reservas, bloqueios, recarregar, equipamen
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Manutenção e Indisponibilidade</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>RF14-RF17, RF31-RF32 · Registre bloqueios, manutenções e acompanhe o histórico.</p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)' }}>· Registre bloqueios, manutenções e acompanhe o histórico.</p>
           </div>
           <Button variant="link" className="app-rb-button" onClick={() => { setShowForm(s => !s); setForm(emptyForm); setNotifSent(false); }} style={{ ...btn({ background: showForm ? 'var(--muted)' : 'var(--primary)', color: '#fff' }) }}>
             {showForm ? '✕ Cancelar' : '+ Registrar Manutenção'}
@@ -2166,15 +2163,15 @@ const [loginCarregando, setLoginCarregando] = useState(false);
         { label: 'Consultar Salas / Lab', icon: '🔍', color: '#2e7d5e', desc: 'Veja disponibilidade em tempo real', action: () => goPage('consultar') },
     ];
     const coordCards = [
-        { label: 'Todas as Reservas', icon: '📊', color: '#1a3a5c', desc: 'Visualize, filtre e gerencie reservas (RF11-RF13)', action: () => goPage('coord-reservas') },
-        { label: 'Bloquear Recursos', icon: '🚫', color: '#c4843a', desc: 'Bloqueie horários, salas, labs e equipamentos (RF14-RF17)', action: () => goPage('coord-bloquear') },
-        { label: 'Consultar Disponibilidade', icon: '🔍', color: '#2e7d5e', desc: 'Salas, labs e equipamentos disponíveis (RF20)', action: () => goPage('consultar') },
-        { label: 'Relatórios de Utilização', icon: '📈', color: '#6b3fa0', desc: 'Histórico e estatísticas de uso (RF21)', action: () => goPage('coord-relatorios') },
+        { label: 'Todas as Reservas', icon: '📊', color: '#1a3a5c', desc: 'Visualize, filtre e gerencie reservas ', action: () => goPage('coord-reservas') },
+        { label: 'Bloquear Recursos', icon: '🚫', color: '#c4843a', desc: 'Bloqueie horários, salas, labs e equipamentos)', action: () => goPage('coord-bloquear') },
+        { label: 'Consultar Disponibilidade', icon: '🔍', color: '#2e7d5e', desc: 'Salas, labs e equipamentos disponíveis', action: () => goPage('consultar') },
+        { label: 'Relatórios de Utilização', icon: '📈', color: '#6b3fa0', desc: 'Histórico e estatísticas de uso', action: () => goPage('coord-relatorios') },
     ];
     const secCards = [
-        { label: 'Salas e Laboratórios', icon: '🏫', color: '#1a3a5c', desc: 'Cadastre e gerencie salas e laboratórios (RF22-RF23)', action: () => goPage('sec-salas') },
-        { label: 'Equipamentos e Patrimônio', icon: '💻', color: '#c4843a', desc: 'Patrimônio, manutenção e situação (RF24-RF37)', action: () => goPage('sec-equipamentos') },
-        { label: 'Histórico e Manutenção', icon: '🔧', color: '#6b3fa0', desc: 'Registre e acompanhe manutenções (RF31-RF32)', action: () => goPage('sec-patrimonio') },
+        { label: 'Salas e Laboratórios', icon: '🏫', color: '#1a3a5c', desc: 'Cadastre e gerencie salas e laboratórios', action: () => goPage('sec-salas') },
+        { label: 'Equipamentos e Patrimônio', icon: '💻', color: '#c4843a', desc: 'Patrimônio, manutenção e situação', action: () => goPage('sec-equipamentos') },
+        { label: 'Histórico e Manutenção', icon: '🔧', color: '#6b3fa0', desc: 'Registre e acompanhe manutenções', action: () => goPage('sec-patrimonio') },
     ];
     const adminCards = [
   {
@@ -2240,13 +2237,13 @@ const [loginCarregando, setLoginCarregando] = useState(false);
           </div>
         </main>)}
 
-      {page === 'reserva' && user && <PageReserva reservaStep={reservaStep} setReservaStep={setReservaStep} reservaLocal={reservaLocal} setReservaLocal={setReservaLocal} reservaFinalidade={reservaFinalidade} setReservaFinalidade={setReservaFinalidade} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth} selectedDay={selectedDay} setSelectedDay={setSelectedDay} recarregar={recarregarDados} backToDash={backToDash} user={user}/>}
+      {page === 'reserva' && user && <PageReserva reservaStep={reservaStep} setReservaStep={setReservaStep} reservaLocal={reservaLocal} setReservaLocal={setReservaLocal} reservaFinalidade={reservaFinalidade} setReservaFinalidade={setReservaFinalidade} calYear={calYear} setCalYear={setCalYear} calMonth={calMonth} setCalMonth={setCalMonth} selectedDay={selectedDay} setSelectedDay={setSelectedDay} recarregar={recarregarDados} backToDash={backToDash} user={user} espacos={espacos} equipamentos={equipamentos}/>}
       {page === 'minhas-reservas' && user && <PageMinhasReservas reservas={reservas} user={user} cancelReserva={cancelReserva} backToDash={backToDash} onVerAgenda={d => { setAgendaDate(d); setAgendaFrom('minhas-reservas'); goPage('agenda'); }}/>}
-      {page === 'consultar' && user && <PageConsultar equipamentos={equipamentos} bloqueios={bloqueios} reservas={reservas} backToDash={backToDash}/>}
+      {page === 'consultar' && user && <PageConsultar espacos={espacos} equipamentos={equipamentos} bloqueios={bloqueios} reservas={reservas} backToDash={backToDash}/>}
       {page === 'coord-reservas' && user && <PageCoordReservas reservas={reservas} filterRecurso={filterRecurso} setFilterRecurso={setFilterRecurso} filterUsuario={filterUsuario} setFilterUsuario={setFilterUsuario} cancelReserva={cancelReserva} backToDash={backToDash} onSolicitarReserva={() => { goPage('reserva'); setReservaStep('calendar'); setSelectedDay(null); }} onVerAgenda={d => { setAgendaDate(d); setAgendaFrom('coord-reservas'); goPage('agenda'); }}/>}
       {page === 'agenda' && user && <PageAgenda data={agendaDate} reservas={reservas} onBack={() => setPage(agendaFrom)}/>}
-      {page === 'coord-bloquear' && user && <PageCoordBloquear bloqueios={bloqueios} recarregar={recarregarDados} backToDash={backToDash}/>}
-      {page === 'coord-relatorios' && user && <PageRelatorios reservas={reservas} bloqueios={bloqueios} backToDash={backToDash}/>}
+      {page === 'coord-bloquear' && user && <PageCoordBloquear espacos={espacos} equipamentos={equipamentos} bloqueios={bloqueios} recarregar={recarregarDados} backToDash={backToDash}/>}
+      {page === 'coord-relatorios' && user && <PageRelatorios espacos={espacos} reservas={reservas} bloqueios={bloqueios} backToDash={backToDash}/>}
       {page === 'sec-equipamentos' && user && <PageEquipamentos equipamentos={equipamentos} recarregar={recarregarDados} eqFilter={eqFilter} setEqFilter={setEqFilter} backToDash={backToDash}/>}
       {(page === 'sec-salas' || page === 'sec-labs') && user && <PageCadastroEspaco tipoProp={page === 'sec-labs' ? 'Laboratório' : 'Sala'} espacos={espacos} recarregar={recarregarDados} backToDash={backToDash}/>}
       {page === 'sec-patrimonio' && user && <PagePatrimonio backToDash={backToDash} reservas={reservas} bloqueios={bloqueios} recarregar={recarregarDados} equipamentos={equipamentos} espacos={espacos}/>}
@@ -2286,7 +2283,6 @@ const [loginCarregando, setLoginCarregando] = useState(false);
       {/* FOOTER */}
       <footer style={{ borderTop: '1px solid var(--border)', background: 'var(--background)' }} className="app-footer">
         <span style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>© 2026 Sistema de Reservas · E.E. Washington Luiz</span>
-        <span style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)' }}>RF01-RF46 · RNF01-RNF24 implementados</span>
       </footer>
 
       {/* LOGIN MODAL */}
@@ -2294,7 +2290,6 @@ const [loginCarregando, setLoginCarregando] = useState(false);
           <div style={{ background: 'var(--background)', border: '2px solid var(--foreground)', borderRadius: '4px', padding: '2.5rem 2rem', width: '100%', maxWidth: '400px', position: 'relative' }} onClick={e => e.stopPropagation()}>
             <Button variant="link" className="app-rb-button" onClick={() => setLoginOpen(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'var(--muted-foreground)' }}>✕</Button>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.25rem' }}>Acesso ao Sistema</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' }}>RF01 · Entre com suas credenciais institucionais.</p>
             <div style={{ marginBottom: '1rem' }}><label style={label}>E-mail</label><input type="email" placeholder="usuario@escola.edu.br" onChange={e => setLoginEmail(e.target.value)} style={field}/></div>
             <div style={{ marginBottom: '0.5rem' }}><label style={label}>Senha</label> <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" style={field}/></div>
             <div style={{ textAlign: 'right', marginBottom: '1.25rem' }}>
@@ -2367,3 +2362,4 @@ const [loginCarregando, setLoginCarregando] = useState(false);
         </div>)}
     </div>);
 }
+
