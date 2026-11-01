@@ -6,7 +6,7 @@ Os testes ficam em `backend/cadastros/`:
 
 | Arquivo | O que cobre |
 |---|---|
-| `tests.py` | Testes de API (reservas, cadastros, login, usuários) |
+| `tests.py` | Testes de API já existentes (reservas, cadastros, login, usuários) |
 | `test_services.py` | `interpretar_horario`, `registrar`, `travar_recurso`, `motivos_de_indisponibilidade` |
 | `test_models.py` | Modelos: nome automático do equipamento, `horario`, ordenação, chaves estrangeiras |
 | `test_permissions.py` | `perfil_de`, `nome_exibicao`, `perfis_permitidos` |
@@ -44,7 +44,7 @@ Alguns testes específicos do PostgreSQL (`travar_recurso`) usam *mock* e funcio
 ## Frontend (React)
 
 Os testes de `src/api.js` e `src/adminUsuarios.js` usam o executor nativo do Node
-(`node:test`, Node 20+)
+(`node:test`, Node 20+) e **não exigem nenhuma dependência nova**:
 
 ```bash
 cd homepage-conversion

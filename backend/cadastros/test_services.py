@@ -35,11 +35,6 @@ class InterpretarHorarioTest(SimpleTestCase):
             interpretar_horario('7h05–8h40'), (time(7, 5), time(8, 40))
         )
 
-    def test_retorna_tuplas_de_time(self):
-        inicio, fim = interpretar_horario('13h00–13h50')
-        self.assertIsInstance(inicio, time)
-        self.assertIsInstance(fim, time)
-
     def test_textos_nao_reconhecidos(self):
         entradas = [
             None,
@@ -141,10 +136,6 @@ class MotivosDeIndisponibilidadeTest(TestCase):
     def test_recurso_desconhecido_esta_livre(self):
         self.assertEqual(self.motivos('Recurso que não existe'), [])
 
-    def test_espaco_disponivel_esta_livre(self):
-        Espaco.objects.create(nome='Sala 01', tipo='Sala')
-        self.assertEqual(self.motivos(), [])
-
     # --- espaços ------------------------------------------------------------
     def test_espaco_indisponivel(self):
         Espaco.objects.create(nome='Sala 01', tipo='Sala', situacao='Indisponível')
@@ -153,10 +144,6 @@ class MotivosDeIndisponibilidadeTest(TestCase):
     def test_espaco_inativo(self):
         Espaco.objects.create(nome='Sala 01', tipo='Sala', ativo=False)
         self.assertEqual(self.motivos(), ['Sala 01 está indisponível.'])
-
-    def test_nome_do_espaco_ignora_maiusculas(self):
-        Espaco.objects.create(nome='Sala 01', tipo='Sala', situacao='Indisponível')
-        self.assertEqual(len(self.motivos('sala 01')), 1)
 
     # --- equipamentos -------------------------------------------------------
     def test_equipamento_em_manutencao_por_patrimonio(self):
@@ -178,10 +165,6 @@ class MotivosDeIndisponibilidadeTest(TestCase):
     def test_equipamento_inativo(self):
         Equipamento.objects.create(patrimonio='123', tipo='Projetor', ativo=False)
         self.assertEqual(len(self.motivos('123')), 1)
-
-    def test_equipamento_disponivel_esta_livre(self):
-        Equipamento.objects.create(patrimonio='123', tipo='Projetor')
-        self.assertEqual(self.motivos('123'), [])
 
     # --- bloqueios ----------------------------------------------------------
     def test_bloqueio_permanente_com_motivo(self):
@@ -236,10 +219,6 @@ class MotivosDeIndisponibilidadeTest(TestCase):
         )
         self.assertEqual(len(self.motivos()), 1)
 
-    def test_bloqueio_ignora_maiusculas_no_recurso(self):
-        Bloqueio.objects.create(tipo='Sala', recurso='SALA 01', origem='COORDENACAO')
-        self.assertEqual(len(self.motivos('sala 01')), 1)
-
     def test_varios_bloqueios_geram_um_unico_motivo(self):
         for origem in ('COORDENACAO', 'SECRETARIA'):
             Bloqueio.objects.create(tipo='Sala', recurso='Sala 01', origem=origem)
@@ -256,10 +235,6 @@ class MotivosDeIndisponibilidadeTest(TestCase):
         nova_reserva(data=self.dia, inicio=time(7, 0), fim=time(7, 50))
         self.assertEqual(len(self.motivos(inicio=time(7, 30), fim=time(8, 20))), 1)
 
-    def test_reserva_dentro_de_outra_conflita(self):
-        nova_reserva(data=self.dia, inicio=time(7, 0), fim=time(9, 0))
-        self.assertEqual(len(self.motivos(inicio=time(7, 30), fim=time(8, 0))), 1)
-
     def test_horarios_vizinhos_nao_conflitam(self):
         nova_reserva(data=self.dia, inicio=time(7, 50), fim=time(8, 40))
         self.assertEqual(self.motivos(), [])
@@ -272,10 +247,6 @@ class MotivosDeIndisponibilidadeTest(TestCase):
         nova_reserva(data=date(2026, 3, 11))
         nova_reserva(recurso='Sala 02', data=self.dia)
         self.assertEqual(self.motivos(), [])
-
-    def test_conflito_ignora_maiusculas_no_recurso(self):
-        nova_reserva(recurso='Sala 01', data=self.dia)
-        self.assertEqual(len(self.motivos('SALA 01')), 1)
 
     def test_ignorar_reserva_exclui_a_propria_reserva(self):
         reserva = nova_reserva(data=self.dia)

@@ -49,7 +49,7 @@ describe('requisições com corpo (POST/PATCH)', () => {
     const dados = await api.criarReserva({ recurso: 'Sala 01' });
 
     eq.deepEqual(dados, { id: 1 });
-    eq.equal(chamadas.length, 1);
+    eq.equal(chamadas.length, 1); // não precisou pedir /csrf/
     const { url, opcoes } = chamadas[0];
     eq.equal(url, '/api/reservas/');
     eq.equal(opcoes.method, 'POST');
@@ -147,6 +147,7 @@ describe('sessão', () => {
 
   it('login busca o token CSRF antes de enviar as credenciais', async () => {
     instalarNavegador({ cookie: '' });
+    // Como no navegador: a chamada a /api/csrf/ grava o cookie "csrftoken".
     const chamadas = simularFetch((url) => {
       if (url === '/api/csrf/') {
         globalThis.document.cookie = 'csrftoken=t';

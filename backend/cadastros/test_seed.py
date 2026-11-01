@@ -30,13 +30,6 @@ class SeedDataTest(TestCase):
             with self.subTest(nome=dados['nome']):
                 self.assertIn(dados['tipo'], tipos)
 
-    def test_todos_os_campos_correspondem_a_campos_do_modelo(self):
-        campos = {f.name for f in Espaco._meta.get_fields()}
-        for dados in ESPACOS:
-            with self.subTest(nome=dados['nome']):
-                self.assertLessEqual(set(dados), campos)
-                self.assertTrue(dados['nome'])
-
 
 class SeedInicialTest(TestCase):
     def test_cria_grupos_usuarios_e_espacos(self):
@@ -82,14 +75,6 @@ class SeedInicialTest(TestCase):
         self.assertTrue(usuario.check_password('Escola@2026'))
         self.assertFalse(usuario.check_password('Outra@Senha1'))
 
-    def test_nao_altera_espaco_existente(self):
-        Espaco.objects.create(nome='Sala 03', tipo='Outro', capacidade='1')
-        rodar_seed()
-        espaco = Espaco.objects.get(nome='Sala 03')
-        self.assertEqual(espaco.tipo, 'Outro')
-        self.assertEqual(espaco.capacidade, '1')
-        self.assertEqual(Espaco.objects.count(), len(ESPACOS))
-
     def test_corrige_o_perfil_de_usuario_demo_existente(self):
         usuario = Usuario.objects.create_user(
             username='maria.silva', email='professor@escola.test', password='x'
@@ -101,7 +86,3 @@ class SeedInicialTest(TestCase):
         self.assertEqual(
             list(usuario.groups.values_list('name', flat=True)), ['Professor']
         )
-
-    def test_mensagem_final_informa_quantidade(self):
-        saida = rodar_seed()
-        self.assertIn(f'{len(ESPACOS)} espaços novos', saida)

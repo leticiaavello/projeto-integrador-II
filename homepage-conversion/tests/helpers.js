@@ -1,3 +1,6 @@
+// Utilitários dos testes: simulam o navegador (document, window) e o fetch.
+
+/** Instala `document.cookie` e `window.alert` falsos; devolve os avisos mostrados. */
 export function instalarNavegador({ cookie = '' } = {}) {
   const alertas = [];
   globalThis.document = { cookie };
@@ -5,6 +8,7 @@ export function instalarNavegador({ cookie = '' } = {}) {
   return alertas;
 }
 
+/** Resposta de fetch. `corpo === undefined` simula um corpo que não é JSON. */
 export function resposta(corpo, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -16,6 +20,11 @@ export function resposta(corpo, status = 200) {
   };
 }
 
+/**
+ * Substitui `fetch`. Aceita uma fila de respostas (consumidas em ordem) ou uma
+ * função `(url, opcoes) => resposta`. Um `Error` na fila vira rejeição.
+ * Devolve a lista de chamadas feitas: `{ url, opcoes }`.
+ */
 export function simularFetch(...respostas) {
   const chamadas = [];
   globalThis.fetch = async (url, opcoes = {}) => {

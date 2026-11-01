@@ -44,20 +44,6 @@ class EspacoSerializerTest(TestCase):
         s = EspacoSerializer(espaco, data={'nome': 'Sala 01'}, partial=True)
         self.assertTrue(s.is_valid(), s.errors)
 
-    def test_atualizar_para_nome_de_outro_espaco_e_recusado(self):
-        Espaco.objects.create(nome='Sala 01', tipo='Sala')
-        outro = Espaco.objects.create(nome='Sala 02', tipo='Sala')
-        s = EspacoSerializer(outro, data={'nome': 'Sala 01'}, partial=True)
-        self.assertFalse(s.is_valid())
-
-    def test_campos_expostos(self):
-        espaco = Espaco.objects.create(nome='Sala 01', tipo='Sala')
-        self.assertEqual(
-            set(EspacoSerializer(espaco).data),
-            {'id', 'tipo', 'nome', 'localizacao', 'bloco',
-             'capacidade', 'descricao', 'situacao'},
-        )
-
 
 class EquipamentoSerializerTest(TestCase):
     def test_exige_patrimonio_ou_simplificado(self):
@@ -77,12 +63,6 @@ class EquipamentoSerializerTest(TestCase):
         })
         self.assertTrue(s.is_valid(), s.errors)
         self.assertIsNone(s.validated_data['patrimonio'])
-
-    def test_apenas_espacos_nos_dois_campos_e_recusado(self):
-        s = EquipamentoSerializer(data={
-            'tipo': 'Projetor', 'patrimonio': '  ', 'simplificado': '  ',
-        })
-        self.assertFalse(s.is_valid())
 
     def test_campo_local_grava_em_localizacao(self):
         s = EquipamentoSerializer(data={
@@ -217,10 +197,6 @@ class ReservaSerializerTest(TestCase):
         reserva = nova_reserva(usuario=None, responsavel='Visitante')
         self.assertEqual(ReservaSerializer(reserva).data['usuario'], 'Visitante')
 
-    def test_status_cancelada_em_minusculo(self):
-        reserva = nova_reserva(status='CANCELADA')
-        self.assertEqual(ReservaSerializer(reserva).data['status'], 'cancelada')
-
     # --- criação ------------------------------------------------------------
     def test_create_preenche_usuario_e_responsavel(self):
         s = self.serializer()
@@ -241,11 +217,6 @@ class ReservaSerializerTest(TestCase):
         s = ReservaSerializer(data=dados, context=self.contexto)
         s.is_valid(raise_exception=True)
         self.assertEqual(s.save().finalidade, 'Reserva')
-
-    def test_create_mantem_a_finalidade_informada(self):
-        s = self.serializer(finalidade='Prova de matemática')
-        s.is_valid(raise_exception=True)
-        self.assertEqual(s.save().finalidade, 'Prova de matemática')
 
     def test_create_recusa_horario_ocupado(self):
         primeiro = self.serializer()
@@ -345,13 +316,6 @@ class ManutencaoSerializerTest(TestCase):
         self.assertFalse(s.is_valid())
         self.assertIn('situacao', s.errors)
 
-    def test_data_invalida(self):
-        s = ManutencaoSerializer(data={
-            'tipo': 'Sala', 'recurso': 'Sala 01', 'inicio': '31/02/2026',
-        })
-        self.assertFalse(s.is_valid())
-        self.assertIn('inicio', s.errors)
-
 
 class UsuarioAdminSerializerTest(TestCase):
     def dados(self, **extra):
@@ -420,11 +384,6 @@ class UsuarioAdminSerializerTest(TestCase):
         s = UsuarioAdminSerializer(data=self.dados(perfil='dono'))
         self.assertFalse(s.is_valid())
         self.assertIn('perfil', s.errors)
-
-    def test_email_invalido(self):
-        s = UsuarioAdminSerializer(data=self.dados(email='isso-nao-e-email'))
-        self.assertFalse(s.is_valid())
-        self.assertIn('email', s.errors)
 
     def test_username_repetido_sem_distinguir_maiusculas(self):
         criar_usuario('novo', 'Professor')

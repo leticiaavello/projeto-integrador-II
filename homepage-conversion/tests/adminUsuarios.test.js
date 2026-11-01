@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe('listarUsuarios', () => {
-  it('GET em /api/usuarios/', async () => {
+  it('faz GET em /api/usuarios/ sem pedir CSRF', async () => {
     const chamadas = simularFetch(resposta([{ id: 1, username: 'maria' }]));
 
     const dados = await listarUsuarios();
@@ -38,7 +38,7 @@ describe('listarUsuarios', () => {
 describe('criarUsuario', () => {
   const novo = { username: 'novo', perfil: 'professor', password: 'SenhaSegura@123' };
 
-  it('pega CSRF e envia JSON', async () => {
+  it('busca o CSRF e envia o usuário como JSON', async () => {
     const chamadas = simularFetch(resposta({ csrfToken: 'do-corpo' }), resposta({ id: 9 }, 201));
 
     const dados = await criarUsuario(novo);
@@ -52,7 +52,7 @@ describe('criarUsuario', () => {
     eq.deepEqual(corpoDe(chamadas[1]), novo);
   });
 
-  it('usa o token do cookie', async () => {
+  it('prefere o token do cookie ao do corpo da resposta', async () => {
     instalarNavegador({ cookie: 'sessionid=s; csrftoken=do-cookie' });
     const chamadas = simularFetch(resposta({ csrfToken: 'do-corpo' }), resposta({}));
 
@@ -61,7 +61,7 @@ describe('criarUsuario', () => {
     eq.equal(chamadas[1].opcoes.headers['X-CSRFToken'], 'do-cookie');
   });
 
-  it('mantém o sinal de igual no cookie', async () => {
+  it('mantém o "=" que fizer parte do valor do cookie', async () => {
     instalarNavegador({ cookie: 'csrftoken=abc=def' });
     const chamadas = simularFetch(resposta({ csrfToken: 'x' }), resposta({}));
 
@@ -79,7 +79,7 @@ describe('criarUsuario', () => {
     eq.equal(chamadas[1].opcoes.headers['X-CSRFToken'], 'a b');
   });
 
-  it('ignora cookie errado', async () => {
+  it('não confunde outro cookie com o csrftoken', async () => {
     instalarNavegador({ cookie: 'meucsrftoken=errado' });
     const chamadas = simularFetch(resposta({ csrfToken: 'certo' }), resposta({}));
 
@@ -88,7 +88,7 @@ describe('criarUsuario', () => {
     eq.equal(chamadas[1].opcoes.headers['X-CSRFToken'], 'certo');
   });
 
-  it('falha sem CSRF', async () => {
+  it('desiste sem enviar o POST se não conseguir o CSRF', async () => {
     const chamadas = simularFetch(resposta({}, 500));
 
     await eq.rejects(criarUsuario(novo), { message: 'Não foi possível obter o token CSRF.' });
@@ -97,7 +97,7 @@ describe('criarUsuario', () => {
 });
 
 describe('atualizarUsuario, ativarUsuario e desativarUsuario', () => {
-  it('atualizarUsuario usa PATCH', async () => {
+  it('atualizarUsuario faz PATCH em /api/usuarios/:id/', async () => {
     const chamadas = simularFetch(resposta({ csrfToken: 't' }), resposta({ id: 7 }));
 
     await atualizarUsuario(7, { perfil: 'secretaria' });
@@ -111,7 +111,7 @@ describe('atualizarUsuario, ativarUsuario e desativarUsuario', () => {
     ['ativarUsuario', ativarUsuario, 'ativar'],
     ['desativarUsuario', desativarUsuario, 'desativar'],
   ]) {
-    it(`${nome} usa POST sem corpo`, async () => {
+    it(`${nome} faz POST em /api/usuarios/:id/${sufixo}/ sem corpo`, async () => {
       const chamadas = simularFetch(resposta({ csrfToken: 't' }), resposta({ is_active: true }));
 
       const dados = await funcao(7);
@@ -127,12 +127,13 @@ describe('atualizarUsuario, ativarUsuario e desativarUsuario', () => {
 });
 
 describe('mensagens de erro', () => {
+  // Para GET não há chamada de CSRF: a primeira resposta já é a do erro.
   const casos = [
-    ['detail', { detail: 'Sem permissão.' }, 403, 'Sem permissão.'],
-    ['erro de login', { erro: 'Não autenticado.' }, 401, 'Não autenticado.'],
-    ['detail antes de erro', { detail: 'a', erro: 'b' }, 400, 'a'],
-    ['lista de erros', { email: ['Inválido.', 'Repetido.'] }, 400, 'email: Inválido., Repetido.'],
-    ['texto em campo', { username: 'Repetido' }, 400, 'username: Repetido'],
+    ['"detail" do DRF', { detail: 'Sem permissão.' }, 403, 'Sem permissão.'],
+    ['"erro" do login', { erro: 'Não autenticado.' }, 401, 'Não autenticado.'],
+    ['"detail" tem prioridade sobre "erro"', { detail: 'a', erro: 'b' }, 400, 'a'],
+    ['erros de campo em lista', { email: ['Inválido.', 'Repetido.'] }, 400, 'email: Inválido., Repetido.'],
+    ['erro de campo como texto', { username: 'Repetido' }, 400, 'username: Repetido'],
     ['vários campos', { email: ['x'], password: ['y'] }, 400, 'email: x; password: y'],
     ['corpo vazio', {}, 400, 'Erro HTTP 400'],
     ['corpo nulo', null, 503, 'Erro HTTP 503'],
@@ -150,13 +151,13 @@ describe('mensagens de erro', () => {
     });
   }
 
-  it('usa erro HTTP sem JSON', async () => {
+  it('usa "Erro HTTP" quando a resposta não é JSON', async () => {
     simularFetch(resposta(undefined, 500));
 
     await eq.rejects(listarUsuarios(), { message: 'Erro HTTP 500' });
   });
 
-  it('traduz erros do POST', async () => {
+  it('erros do POST (depois do CSRF) também são traduzidos', async () => {
     simularFetch(
       resposta({ csrfToken: 't' }),
       resposta({ password: ['Esta senha é muito curta.'] }, 400),

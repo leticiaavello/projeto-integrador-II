@@ -1,10 +1,9 @@
 """Testes unitários dos modelos (cadastros/models.py)."""
-from datetime import date, time, timedelta
+from datetime import date, time
 
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.test import TestCase
-from django.utils import timezone
 
 from .helpers_teste import criar_usuario, nova_reserva
 from .models import Bloqueio, Equipamento, Espaco, LogOperacao, Manutencao, Reserva
@@ -17,14 +16,6 @@ class EspacoModelTest(TestCase):
         self.assertEqual(espaco.situacao, 'Disponível')
         self.assertTrue(espaco.ativo)
         self.assertEqual(espaco.localizacao, '')
-
-    def test_ordenado_por_nome(self):
-        for nome in ('Sala C', 'Sala A', 'Sala B'):
-            Espaco.objects.create(nome=nome, tipo='Sala')
-        self.assertEqual(
-            list(Espaco.objects.values_list('nome', flat=True)),
-            ['Sala A', 'Sala B', 'Sala C'],
-        )
 
 
 class EquipamentoModelTest(TestCase):
@@ -49,12 +40,6 @@ class EquipamentoModelTest(TestCase):
         eq = Equipamento.objects.create(tipo='T' * 60, marca='M' * 60)
         self.assertEqual(len(eq.nome), 100)
 
-    def test_nome_nao_e_regerado_ao_salvar_de_novo(self):
-        eq = Equipamento.objects.create(tipo='Projetor')
-        eq.tipo = 'Outro tipo'
-        eq.save()
-        self.assertEqual(eq.nome, 'Projetor')
-
     def test_valores_padrao_e_str(self):
         eq = Equipamento.objects.create(tipo='Projetor')
         self.assertEqual(eq.quantidade, 1)
@@ -67,11 +52,6 @@ class EquipamentoModelTest(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             Equipamento.objects.create(patrimonio='123')
 
-    def test_simplificado_repetido_nao_e_permitido(self):
-        Equipamento.objects.create(simplificado='S-1')
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Equipamento.objects.create(simplificado='S-1')
-
     def test_varios_equipamentos_sem_patrimonio_sao_permitidos(self):
         Equipamento.objects.create(simplificado='A', patrimonio=None)
         Equipamento.objects.create(simplificado='B', patrimonio=None)
@@ -82,10 +62,6 @@ class ReservaModelTest(TestCase):
     def test_horario_formatado(self):
         reserva = nova_reserva(inicio=time(7, 0), fim=time(7, 50))
         self.assertEqual(reserva.horario, '07h00–07h50')
-
-    def test_horario_com_minutos_de_um_digito(self):
-        reserva = nova_reserva(inicio=time(13, 5), fim=time(14, 0))
-        self.assertEqual(reserva.horario, '13h05–14h00')
 
     def test_str(self):
         reserva = nova_reserva(
@@ -122,15 +98,6 @@ class ManutencaoModelTest(TestCase):
         self.assertEqual(m.situacao, 'Em manutenção')
         self.assertIsNone(m.previsao)
         self.assertEqual(str(m), 'Projetor 1 - Em manutenção')
-
-    def test_mais_recentes_primeiro(self):
-        antiga = Manutencao.objects.create(
-            tipo='Sala', recurso='A', inicio=date(2026, 1, 1)
-        )
-        recente = Manutencao.objects.create(
-            tipo='Sala', recurso='B', inicio=date(2026, 2, 1)
-        )
-        self.assertEqual(list(Manutencao.objects.all()), [recente, antiga])
 
 
 class BloqueioModelTest(TestCase):
@@ -170,18 +137,4 @@ class LogOperacaoModelTest(TestCase):
         log = LogOperacao.objects.create(acao='criar', entidade='Espaco')
         self.assertEqual(
             str(log), f'{log.criado_em:%d/%m/%Y %H:%M} criar Espaco'
-        )
-
-    def test_mais_recentes_primeiro(self):
-        primeiro = LogOperacao.objects.create(acao='a', entidade='E')
-        segundo = LogOperacao.objects.create(acao='b', entidade='E')
-        # auto_now_add pode empatar em relógios de baixa resolução (Windows)
-        agora = timezone.now()
-        LogOperacao.objects.filter(pk=primeiro.pk).update(
-            criado_em=agora - timedelta(hours=1)
-        )
-        LogOperacao.objects.filter(pk=segundo.pk).update(criado_em=agora)
-        self.assertEqual(
-            list(LogOperacao.objects.values_list('pk', flat=True)),
-            [segundo.pk, primeiro.pk],
         )

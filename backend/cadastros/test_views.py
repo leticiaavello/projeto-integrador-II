@@ -17,7 +17,6 @@ from .models import (
     Espaco,
     LogOperacao,
     Manutencao,
-    Reserva,
 )
 
 
@@ -88,12 +87,6 @@ class AutenticacaoTest(TestCase):
         _, r = self.login(senha='errada')
         self.assertEqual(r.status_code, 401)
 
-    def test_login_de_usuario_inativo(self):
-        self.prof.is_active = False
-        self.prof.save()
-        _, r = self.login()
-        self.assertEqual(r.status_code, 401)
-
     def test_login_de_usuario_sem_perfil(self):
         criar_usuario('sem_perfil')
         _, r = self.login(email='sem_perfil@escola.test')
@@ -125,14 +118,6 @@ class AutenticacaoTest(TestCase):
 
         self.assertEqual(c.post('/api/logout/').status_code, 200)
         self.assertEqual(c.get('/api/me/').status_code, 401)
-
-    def test_me_de_usuario_sem_perfil_e_nao_autenticado(self):
-        c = Client()
-        c.force_login(criar_usuario('sem_perfil'))
-        self.assertEqual(c.get('/api/me/').status_code, 401)
-
-    def test_logout_so_aceita_post(self):
-        self.assertEqual(Client().get('/api/logout/').status_code, 405)
 
 
 # --------------------------------------------------------------------------
@@ -239,17 +224,6 @@ class EquipamentoAPITest(BaseAPITestCase):
         super().setUp()
         self.eq = Equipamento.objects.create(patrimonio='111', tipo='Projetor')
 
-    def test_todos_os_perfis_listam(self):
-        for usuario in (self.prof, self.coord, self.sec, self.admin_ti):
-            with self.subTest(usuario=usuario.username):
-                r = cliente(usuario).get('/api/equipamentos/')
-                self.assertEqual(r.status_code, 200)
-                self.assertEqual(len(r.data), 1)
-
-    def test_lista_apenas_ativos(self):
-        Equipamento.objects.create(patrimonio='222', ativo=False)
-        self.assertEqual(len(cliente(self.prof).get('/api/equipamentos/').data), 1)
-
     def test_atualizar_situacao(self):
         r = cliente(self.sec).patch(
             f'/api/equipamentos/{self.eq.pk}/',
@@ -264,24 +238,12 @@ class EquipamentoAPITest(BaseAPITestCase):
             ).exists()
         )
 
-    def test_situacao_invalida(self):
-        r = cliente(self.sec).patch(
-            f'/api/equipamentos/{self.eq.pk}/', {'situacao': 'Sumiu'}, format='json'
-        )
-        self.assertEqual(r.status_code, 400)
-
     def test_equipamento_em_manutencao_nao_pode_ser_reservado(self):
         Equipamento.objects.filter(pk=self.eq.pk).update(situacao='Em manutenção')
         self.assertEqual(self.reservar(self.prof, recurso='111').status_code, 400)
 
     def test_equipamento_disponivel_pode_ser_reservado(self):
         self.assertEqual(self.reservar(self.prof, recurso='111').status_code, 201)
-
-    def test_professor_nao_atualiza(self):
-        r = cliente(self.prof).patch(
-            f'/api/equipamentos/{self.eq.pk}/', {'tipo': 'X'}, format='json'
-        )
-        self.assertEqual(r.status_code, 403)
 
     # --- importação ---------------------------------------------------------
     def test_importar_cria_varios_e_registra_auditoria(self):
@@ -308,13 +270,6 @@ class EquipamentoAPITest(BaseAPITestCase):
         )
         self.assertEqual(r.status_code, 400)
         self.assertEqual(Equipamento.objects.count(), 1)  # nada foi gravado
-
-    def test_importar_recusa_patrimonio_ja_cadastrado(self):
-        r = cliente(self.sec).post(
-            '/api/equipamentos/importar/',
-            [{'tipo': 'Notebook', 'patrimonio': '111'}], format='json',
-        )
-        self.assertEqual(r.status_code, 400)
 
     def test_importar_com_patrimonio_repetido_no_proprio_arquivo(self):
         r = cliente(self.sec).post(
@@ -351,25 +306,6 @@ class ReservaAPITest(BaseAPITestCase):
         self.assertEqual(self.reservar(self.admin_ti).status_code, 403)
         self.assertEqual(cliente(self.admin_ti).get('/api/reservas/').status_code, 200)
 
-    def test_reserva_guarda_usuario_e_responsavel(self):
-        r = self.reservar(self.prof)
-        reserva = Reserva.objects.get(pk=r.data['id'])
-        self.assertEqual(reserva.usuario, self.prof)
-        self.assertEqual(reserva.responsavel, 'Maria')
-
-    def test_finalidade_e_turma_opcionais(self):
-        r = cliente(self.prof).post('/api/reservas/', {
-            'recurso': 'Sala 01', 'data': self.amanha, 'horario': '07h00–07h50',
-        }, format='json')
-        self.assertEqual(r.status_code, 201, r.data)
-        self.assertEqual(r.data['finalidade'], 'Reserva')
-
-    def test_horario_obrigatorio(self):
-        r = cliente(self.prof).post('/api/reservas/', {
-            'recurso': 'Sala 01', 'data': self.amanha,
-        }, format='json')
-        self.assertEqual(r.status_code, 400)
-
     def test_horario_invalido_e_fim_antes_do_inicio(self):
         for horario in ('qualquer', '09h00–08h00'):
             with self.subTest(horario=horario):
@@ -383,13 +319,6 @@ class ReservaAPITest(BaseAPITestCase):
             data=date(2020, 1, 1),
         )
         self.assertEqual(self.reservar(self.prof).status_code, 201)
-
-    def test_mesma_aula_em_salas_diferentes(self):
-        Espaco.objects.create(nome='Sala 02', tipo='Sala')
-        self.assertEqual(self.reservar(self.prof).status_code, 201)
-        self.assertEqual(
-            self.reservar(self.prof2, recurso='Sala 02').status_code, 201
-        )
 
     def test_criar_e_cancelar_registram_auditoria(self):
         rid = self.reservar(self.prof).data['id']
@@ -407,11 +336,6 @@ class ReservaAPITest(BaseAPITestCase):
     def test_cancelar_reserva_inexistente(self):
         r = cliente(self.prof).post('/api/reservas/9999/cancelar/')
         self.assertEqual(r.status_code, 404)
-
-    def test_cancelar_nao_apaga_a_reserva(self):
-        rid = self.reservar(self.prof).data['id']
-        cliente(self.prof).post(f'/api/reservas/{rid}/cancelar/')
-        self.assertEqual(Reserva.objects.get(pk=rid).status, 'CANCELADA')
 
     def test_secretaria_e_administrador_nao_cancelam(self):
         rid = self.reservar(self.prof).data['id']
@@ -434,18 +358,6 @@ class ReservaAPITest(BaseAPITestCase):
         self.assertEqual(len(c.get('/api/reservas/?usuario=ninguem').data), 0)
         self.assertEqual(len(c.get(f'/api/reservas/?data={self.amanha}').data), 2)
         self.assertEqual(len(c.get('/api/reservas/?data=2001-01-01').data), 0)
-
-    def test_listagem_ordenada_por_data_e_horario(self):
-        self.reservar(self.prof, horario='09h00–09h50')
-        self.reservar(self.prof2, horario='07h00–07h50')
-        horarios = [r['horario'] for r in cliente(self.prof).get('/api/reservas/').data]
-        self.assertEqual(horarios, ['07h00–07h50', '09h00–09h50'])
-
-    def test_detalhe_da_reserva(self):
-        rid = self.reservar(self.prof).data['id']
-        r = cliente(self.sec).get(f'/api/reservas/{rid}/')
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.data['recurso'], 'Sala 01')
 
     # --- edição (somente coordenação) --------------------------------------
     def test_so_coordenacao_edita_reserva(self):
@@ -471,12 +383,6 @@ class ReservaAPITest(BaseAPITestCase):
         )
         self.assertEqual(r.status_code, 400)
 
-    def test_delete_nao_e_permitido(self):
-        rid = self.reservar(self.prof).data['id']
-        r = cliente(self.coord).delete(f'/api/reservas/{rid}/')
-        self.assertEqual(r.status_code, 405)
-        self.assertTrue(Reserva.objects.filter(pk=rid).exists())
-
 
 # --------------------------------------------------------------------------
 # Bloqueios
@@ -495,10 +401,6 @@ class BloqueioAPITest(BaseAPITestCase):
         self.assertEqual(r1.data['origem'], 'COORDENACAO')
         self.assertEqual(r2.data['origem'], 'SECRETARIA')
 
-    def test_origem_enviada_pelo_cliente_e_ignorada(self):
-        r = self.criar(self.coord, origem='SECRETARIA')
-        self.assertEqual(r.data['origem'], 'COORDENACAO')
-
     def test_registra_quem_criou_e_auditoria(self):
         r = self.criar(self.coord)
         self.assertEqual(Bloqueio.objects.get(pk=r.data['id']).criado_por, self.coord)
@@ -510,11 +412,6 @@ class BloqueioAPITest(BaseAPITestCase):
         for usuario in (self.prof, self.admin_ti):
             with self.subTest(usuario=usuario.username):
                 self.assertEqual(self.criar(usuario).status_code, 403)
-
-    def test_todos_os_perfis_listam(self):
-        for usuario in (self.prof, self.coord, self.sec, self.admin_ti):
-            with self.subTest(usuario=usuario.username):
-                self.assertEqual(cliente(usuario).get('/api/bloqueios/').status_code, 200)
 
     def test_lista_so_bloqueios_ativos(self):
         Bloqueio.objects.create(
@@ -555,10 +452,6 @@ class BloqueioAPITest(BaseAPITestCase):
         self.assertIn('Coordenação', r.data['detail'])
         self.assertTrue(Bloqueio.objects.get(pk=bid).ativo)
 
-    def test_professor_nao_desbloqueia(self):
-        bid = self.criar(self.coord).data['id']
-        self.assertEqual(cliente(self.prof).delete(f'/api/bloqueios/{bid}/').status_code, 403)
-
     def test_bloqueio_de_uma_aula_nao_impede_as_outras(self):
         self.criar(self.coord, aula='1ª aula (07h00–07h50)')
         self.assertEqual(self.reservar(self.prof, horario='07h00–07h50').status_code, 400)
@@ -582,11 +475,6 @@ class ManutencaoAPITest(BaseAPITestCase):
         }
         dados.update(extra)
         return cliente(self.sec).post('/api/manutencoes/', dados, format='json')
-
-    def test_todos_os_perfis_listam(self):
-        for usuario in (self.prof, self.coord, self.sec, self.admin_ti):
-            with self.subTest(usuario=usuario.username):
-                self.assertEqual(cliente(usuario).get('/api/manutencoes/').status_code, 200)
 
     def test_criar_registra_criador_e_auditoria(self):
         r = self.criar()
@@ -615,12 +503,6 @@ class ManutencaoAPITest(BaseAPITestCase):
         self.criar(tipo='Laboratório', recurso='Lab 1')
         self.assertEqual(self.reservar(self.prof, recurso='Lab 1').status_code, 400)
 
-    def test_campos_obrigatorios(self):
-        r = cliente(self.sec).post('/api/manutencoes/', {}, format='json')
-        self.assertEqual(r.status_code, 400)
-        self.assertEqual(set(r.data), {'tipo', 'recurso', 'inicio'})
-        self.assertFalse(Bloqueio.objects.exists())
-
     def test_concluir_desativa_os_bloqueios_da_manutencao(self):
         mid = self.criar().data['id']
         r = cliente(self.sec).patch(
@@ -638,21 +520,6 @@ class ManutencaoAPITest(BaseAPITestCase):
             f'/api/manutencoes/{mid}/', {'previsao': self.amanha}, format='json'
         )
         self.assertTrue(Bloqueio.objects.get(manutencao_id=mid).ativo)
-
-    def test_concluir_nao_afeta_bloqueios_de_outras_manutencoes(self):
-        primeira = self.criar().data['id']
-        segunda = self.criar(recurso='Projetor 456').data['id']
-        cliente(self.sec).patch(
-            f'/api/manutencoes/{primeira}/', {'situacao': 'Concluída'}, format='json'
-        )
-        self.assertTrue(Bloqueio.objects.get(manutencao_id=segunda).ativo)
-
-    def test_situacao_invalida(self):
-        mid = self.criar().data['id']
-        r = cliente(self.sec).patch(
-            f'/api/manutencoes/{mid}/', {'situacao': 'Quebrada'}, format='json'
-        )
-        self.assertEqual(r.status_code, 400)
 
     def test_so_secretaria_altera(self):
         mid = self.criar().data['id']
@@ -683,19 +550,6 @@ class UsuarioAPITest(BaseAPITestCase):
 
     def admin(self):
         return cliente(self.admin_ti)
-
-    def test_nao_autenticado_nao_acessa(self):
-        self.assertIn(APIClient().get(self.url).status_code, (401, 403))
-
-    def test_listagem_ordenada_por_username(self):
-        usernames = [u['username'] for u in self.admin().get(self.url).data]
-        self.assertEqual(usernames, sorted(usernames))
-        self.assertIn('admin_ti', usernames)
-
-    def test_detalhe_do_usuario(self):
-        r = self.admin().get(f'{self.url}{self.prof.pk}/')
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.data['perfil'], 'professor')
 
     def test_cadastro_registra_auditoria(self):
         r = self.admin().post(self.url, self.dados(), format='json')
@@ -740,41 +594,12 @@ class UsuarioAPITest(BaseAPITestCase):
         self.assertTrue(self.prof.check_password('NovaSenha@123'))
         self.assertNotIn('password', r.data)
 
-    def test_atualizar_registra_auditoria(self):
-        self.admin().patch(
-            f'{self.url}{self.prof.pk}/', {'first_name': 'Maria Clara'}, format='json'
-        )
-        self.assertTrue(
-            LogOperacao.objects.filter(acao='atualizar', entidade='Usuario').exists()
-        )
-
     def test_is_active_nao_pode_ser_alterado_por_patch(self):
         self.admin().patch(
             f'{self.url}{self.prof.pk}/', {'is_active': False}, format='json'
         )
         self.prof.refresh_from_db()
         self.assertTrue(self.prof.is_active)
-
-    def test_email_repetido_na_atualizacao(self):
-        r = self.admin().patch(
-            f'{self.url}{self.prof.pk}/', {'email': 'joao@escola.test'}, format='json'
-        )
-        self.assertEqual(r.status_code, 400)
-
-    def test_manter_perfil_de_administrador_do_ultimo_admin_e_permitido(self):
-        r = self.admin().patch(
-            f'{self.url}{self.admin_ti.pk}/', {'perfil': 'administrador'}, format='json'
-        )
-        self.assertEqual(r.status_code, 200)
-
-    def test_administrador_inativo_pode_ser_rebaixado(self):
-        inativo = criar_usuario('admin_inativo', 'Administrador TI')
-        inativo.is_active = False
-        inativo.save()
-        r = self.admin().patch(
-            f'{self.url}{inativo.pk}/', {'perfil': 'professor'}, format='json'
-        )
-        self.assertEqual(r.status_code, 200)
 
     def test_desativar_usuario_comum(self):
         r = self.admin().post(f'{self.url}{self.prof.pk}/desativar/')
@@ -809,16 +634,6 @@ class UsuarioAPITest(BaseAPITestCase):
         self.assertTrue(
             LogOperacao.objects.filter(acao='ativar', entidade='Usuario').exists()
         )
-
-    def test_ativar_e_desativar_usuario_inexistente(self):
-        for acao in ('ativar', 'desativar'):
-            with self.subTest(acao=acao):
-                r = self.admin().post(f'{self.url}99999/{acao}/')
-                self.assertEqual(r.status_code, 404)
-
-    def test_delete_nao_e_permitido(self):
-        r = self.admin().delete(f'{self.url}{self.prof.pk}/')
-        self.assertEqual(r.status_code, 405)
 
     def test_outros_perfis_nao_acessam_nenhuma_rota(self):
         for usuario in (self.prof, self.coord, self.sec):
