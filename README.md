@@ -74,3 +74,7 @@ Veja o passo a passo completo em [docs/GUIA_BACKEND.md](docs/GUIA_BACKEND.md).
 ## Status do projeto
 
 O projeto encontra-se em desenvolvimento. A estrutura inicial do sistema foi implementada, com backend Django, frontend React e configuração de acesso ao banco de dados. As funcionalidades serão integradas e testadas progressivamente durante o desenvolvimento do Projeto Integrador.
+
+## Testes
+
+Veja como rodar os testes automatizados em [docs/testes.md](docs/testes.md).
